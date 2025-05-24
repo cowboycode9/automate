@@ -28,7 +28,7 @@ jobs:
 
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
-            "Authorization": "Bearer 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",
+            "Authorization": "Bearer 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",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://your-site.com",
             "X-Title": "Your Site Name"
