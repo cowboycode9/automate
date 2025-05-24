@@ -1,18 +1,25 @@
+import os
 import requests
 import json
 import re
 import time
 
-# API configuration
+# Load API key from environment variable
+api_key = os.getenv("OPENROUTER_API_KEY")
+
+if not api_key:
+    raise ValueError("OPENROUTER_API_KEY environment variable is not set.")
+
+# API config
 url = "https://openrouter.ai/api/v1/chat/completions"
 headers = {
-    "Authorization": "Bearer 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",
+    "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
     "HTTP-Referer": "https://your-site.com",
-    "X-Title": "Your Site Name"
+    "X-Title": "Story Generator"
 }
 
-# 10-point outline
+# Outline for the story
 outline_points = [
     "Protagonist receives a mysterious letter with no return address.",
     "The letter warns of a danger that will strike in 24 hours.",
@@ -26,7 +33,7 @@ outline_points = [
     "Resolution and new beginning for protagonist."
 ]
 
-# Clean unwanted content from AI response
+# Function to clean unwanted content from the AI response
 def clean_story_output(raw_text):
     lines = raw_text.splitlines()
     cleaned_lines = []
@@ -42,48 +49,21 @@ def clean_story_output(raw_text):
         cleaned_lines.append(line)
     return '\n'.join(cleaned_lines).strip()
 
-# Story generation function
-def generate_story_part(point, context, is_first=False, is_last=False):
-    if is_first:
-        prompt = (
-            f"You are a professional storyteller.\n"
-            f"Begin the story from scratch using the outline point below.\n"
-            f"This is the very beginning, so introduce the protagonist, setting, and tone naturally.\n"
-            f"Outline Point: {point}\n\n"
-            f"Write at least 500 words for this section.\n"
-            f"Make sure to set the stage clearly and begin the narrative with no assumed prior events.\n"
-            f"Please ONLY provide the story narrative in plain text.\n"
-            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n"
-        )
-    elif is_last:
-        prompt = (
-            f"You are a professional storyteller.\n"
-            f"Use the outline point below to write the final part of the story.\n"
-            f"This is the ending, so conclude the narrative in a satisfying and emotionally resonant way.\n"
-            f"Tie up any loose threads and reflect on the protagonist’s journey.\n"
-            f"Outline Point: {point}\n\n"
-            f"Previous Story Context:\n{context}\n\n"
-            f"Write at least 500 words for this section.\n"
-            f"Ensure consistency in characters, tone, and events.\n"
-            f"Do NOT introduce new subplots or major characters.\n"
-            f"Please ONLY provide the story narrative in plain text.\n"
-            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n"
-        )
-    else:
-        prompt = (
-            f"You are a professional storyteller.\n"
-            f"Based on the outline point below, continue the story coherently using the context provided.\n"
-            f"Outline Point: {point}\n\n"
-            f"Previous Story Context:\n{context}\n\n"
-            f"Write at least 500 words for this section.\n"
-            f"Make sure to keep characters, tone, and events consistent throughout.\n"
-            f"Please ONLY provide the story narrative in plain text.\n"
-            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n"
-        )
-
+# Function to generate story for a given point with context
+def generate_story_part(point, context, index):
+    prompt = (
+        f"You are a professional storyteller.\n"
+        f"Your task is to write a long, engaging, and coherent story that follows a 10-point outline.\n"
+        f"Focus: Write at least 500 words for the current outline point.\n"
+        f"Instructions: Emphasize consistency in characters, tone, and events throughout the story.\n\n"
+        f"{'This is the beginning of the story.' if index == 1 else ''}"
+        f"{'This is the ending of the story.' if index == 10 else ''}\n"
+        f"Outline Point {index}: {point}\n\n"
+        f"Previous Story Context:\n{context}\n\n"
+        f"Please ONLY provide the story narrative in plain text.\n"
+        f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
+        f"Write naturally and engagingly as if for a novel or screenplay.\n"
+    )
     data = {
         "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
         "messages": [
@@ -100,19 +80,16 @@ def generate_story_part(point, context, is_first=False, is_last=False):
         print(f"Error {response.status_code}: {response.text}")
         return None
 
-# Main function to run story generation
 def main():
-    full_story = ""
+    full_story = ""  # Accumulate the story here
 
     for idx, point in enumerate(outline_points, start=1):
         print(f"--- Generating story part {idx} ---")
-        is_first = idx == 1
-        is_last = idx == len(outline_points)
-        story_part = generate_story_part(point, full_story, is_first=is_first, is_last=is_last)
+        story_part = generate_story_part(point, full_story, idx)
         if story_part:
             print(story_part)
             print("\n")
-            full_story += "\n" + story_part
+            full_story += "\n" + story_part  # Append new part to context for next call
             time.sleep(1)
         else:
             print(f"Failed to generate part {idx}. Stopping.")
