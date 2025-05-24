@@ -2,11 +2,12 @@ import requests
 import json
 import re
 import time
+import os
 
 # API configuration
 url = "https://openrouter.ai/api/v1/chat/completions"
 headers = {
-    "Authorization": "Bearer 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",
+    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
     "Content-Type": "application/json",
     "HTTP-Referer": "https://your-site.com",
     "X-Title": "Your Site Name"
@@ -79,7 +80,7 @@ def generate_story_part(point, context, is_first=False, is_last=False):
             f"Outline Point: {point}\n\n"
             f"Previous Story Context:\n{context}\n\n"
             f"Write at least 500 words for this section.\n"
-            f"Ensure consistency in characters, tone, and events.\n"
+            f"Make sure to keep characters, tone, and events consistent throughout.\n"
             f"Please ONLY provide the story narrative in plain text.\n"
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
             f"Write naturally and engagingly as if for a novel or screenplay.\n"
@@ -113,13 +114,13 @@ def main():
         if story_part:
             print(story_part)
             print("\n")
-            full_story += "\n" + story_part + "\n"
+            full_story += "\n" + story_part
             time.sleep(1)
         else:
             print(f"Failed to generate part {idx}. Stopping.")
             break
 
-    # Save story to text file
+    # Save to txt file
     with open("generated_story.txt", "w", encoding="utf-8") as f:
         f.write(full_story.strip())
 
