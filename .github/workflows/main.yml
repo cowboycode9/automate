@@ -18,9 +18,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Run story generator
+      - name: Write and run story generator
         run: |
-          echo '
+          cat << 'EOF' > story_gen.py
 import requests
 import json
 import re
@@ -71,9 +71,9 @@ def generate_story_part(point, context, is_first=False, is_last=False):
             f"Outline Point: {point}\n\n"
             f"Write at least 500 words for this section.\n"
             f"Make sure to set the stage clearly and begin the narrative with no assumed prior events.\n"
+            f"Ensure consistency in characters, tone, and events.\n"
             f"Please ONLY provide the story narrative in plain text.\n"
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n"
         )
     elif is_last:
         prompt = (
@@ -87,8 +87,6 @@ def generate_story_part(point, context, is_first=False, is_last=False):
             f"Ensure consistency in characters, tone, and events.\n"
             f"Do NOT introduce new subplots or major characters.\n"
             f"Please ONLY provide the story narrative in plain text.\n"
-            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n"
         )
     else:
         prompt = (
@@ -97,10 +95,8 @@ def generate_story_part(point, context, is_first=False, is_last=False):
             f"Outline Point: {point}\n\n"
             f"Previous Story Context:\n{context}\n\n"
             f"Write at least 500 words for this section.\n"
-            f"Make sure to keep characters, tone, and events consistent throughout.\n"
+            f"Ensure consistency in characters, tone, and events.\n"
             f"Please ONLY provide the story narrative in plain text.\n"
-            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n"
         )
 
     data = {
@@ -136,5 +132,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-' > story_gen.py
+EOF
+
           python story_gen.py
