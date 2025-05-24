@@ -1,0 +1,33 @@
+name: Run Story Generator
+
+on:
+  workflow_dispatch:  # allows manual triggering from the GitHub UI
+
+jobs:
+  generate-story:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run story generator
+        run: python storygen.py
+
+      - name: Commit generated story to repo
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add generated_story.txt
+          git commit -m "Generated story via GitHub Actions"
+          git push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
