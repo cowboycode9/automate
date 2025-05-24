@@ -1,0 +1,144 @@
+name: Run Story Generator
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-story:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Run story generator script inline
+        run: |
+          cat <<EOF > story_generator.py
+import requests
+import json
+import re
+import time
+
+url = "https://openrouter.ai/api/v1/chat/completions"
+headers = {
+    "Authorization": "Bearer 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",
+    "Content-Type": "application/json",
+    "HTTP-Referer": "https://your-site.com",
+    "X-Title": "Your Site Name"
+}
+
+outline_points = [
+    "Protagonist receives a mysterious letter with no return address.",
+    "The letter warns of a danger that will strike in 24 hours.",
+    "Protagonist initially ignores it but strange events start happening.",
+    "Protagonist decides to investigate the letter further.",
+    "An unexpected ally appears to help the protagonist.",
+    "Danger escalates forcing protagonist to flee.",
+    "Secrets about protagonist’s past are revealed.",
+    "Climax confrontation with antagonist.",
+    "Protagonist overcomes the threat but at a cost.",
+    "Resolution and new beginning for protagonist."
+]
+
+def clean_story_output(raw_text):
+    lines = raw_text.splitlines()
+    cleaned_lines = []
+    skip_patterns = [
+        r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+        r'.*outline.*'
+    ]
+    for line in lines:
+        if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+            continue
+        if "NOTE:" in line or line.strip().endswith(":"):
+            continue
+        cleaned_lines.append(line)
+    return '\\n'.join(cleaned_lines).strip()
+
+def generate_story_part(point, context, is_first=False, is_last=False):
+    if is_first:
+        prompt = (
+            f"You are a professional storyteller.\\n"
+            f"Begin the story from scratch using the outline point below.\\n"
+            f"This is the very beginning, so introduce the protagonist, setting, and tone naturally.\\n"
+            f"Outline Point: {point}\\n\\n"
+            f"Write at least 500 words for this section.\\n"
+            f"Make sure to set the stage clearly and begin the narrative with no assumed prior events.\\n"
+            f"Please ONLY provide the story narrative in plain text.\\n"
+            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+            f"Write naturally and engagingly as if for a novel or screenplay.\\n"
+        )
+    elif is_last:
+        prompt = (
+            f"You are a professional storyteller.\\n"
+            f"Use the outline point below to write the final part of the story.\\n"
+            f"This is the ending, so conclude the narrative in a satisfying and emotionally resonant way.\\n"
+            f"Tie up any loose threads and reflect on the protagonist’s journey.\\n"
+            f"Outline Point: {point}\\n\\n"
+            f"Previous Story Context:\\n{context}\\n\\n"
+            f"Write at least 500 words for this section.\\n"
+            f"Ensure consistency in characters, tone, and events.\\n"
+            f"Do NOT introduce new subplots or major characters.\\n"
+            f"Please ONLY provide the story narrative in plain text.\\n"
+            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+            f"Write naturally and engagingly as if for a novel or screenplay.\\n"
+        )
+    else:
+        prompt = (
+            f"You are a professional storyteller.\\n"
+            f"Based on the outline point below, continue the story coherently using the context provided.\\n"
+            f"Outline Point: {point}\\n\\n"
+            f"Previous Story Context:\\n{context}\\n\\n"
+            f"Write at least 500 words for this section.\\n"
+            f"Make sure to keep characters, tone, and events consistent throughout.\\n"
+            f"Please ONLY provide the story narrative in plain text.\\n"
+            f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+            f"Write naturally and engagingly as if for a novel or screenplay.\\n"
+        )
+
+    data = {
+        "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+        "messages": [{"role": "user", "content": prompt}]
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    if response.status_code == 200:
+        result = response.json()
+        raw_story = result['choices'][0]['message']['content']
+        return clean_story_output(raw_story)
+    else:
+        print(f"Error {response.status_code}: {response.text}")
+        return None
+
+def main():
+    full_story = ""
+    for idx, point in enumerate(outline_points, start=1):
+        print(f"--- Generating story part {idx} ---")
+        is_first = idx == 1
+        is_last = idx == len(outline_points)
+        story_part = generate_story_part(point, full_story, is_first=is_first, is_last=is_last)
+        if story_part:
+            print(story_part)
+            print("\\n")
+            full_story += "\\n" + story_part
+            time.sleep(1)
+        else:
+            print(f"Failed to generate part {idx}. Stopping.")
+            break
+    print("--- FULL STORY GENERATED ---")
+
+if __name__ == "__main__":
+    main()
+EOF
+
+          python story_generator.py
