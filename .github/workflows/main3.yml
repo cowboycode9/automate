@@ -1,0 +1,114 @@
+name: Story Generator
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-story:
+    runs-on: ubuntu-latest
+
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run story generation inline
+        run: |
+          python - <<EOF
+          import os
+          import requests
+          import json
+          import re
+          import time
+
+          url = "https://openrouter.ai/api/v1/chat/completions"
+          headers = {
+              "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://your-site.com",
+              "X-Title": "Your Site Name"
+          }
+
+          outline_points = [
+              "Protagonist receives a mysterious letter with no return address.",
+              "The letter warns of a danger that will strike in 24 hours.",
+              "Protagonist initially ignores it but strange events start happening.",
+              "Protagonist decides to investigate the letter further.",
+              "An unexpected ally appears to help the protagonist.",
+              "Danger escalates forcing protagonist to flee.",
+              "Secrets about protagonist’s past are revealed.",
+              "Climax confrontation with antagonist.",
+              "Protagonist overcomes the threat but at a cost.",
+              "Resolution and new beginning for protagonist."
+          ]
+
+          def clean_story_output(raw_text):
+              lines = raw_text.splitlines()
+              cleaned_lines = []
+              skip_patterns = [
+                  r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+                  r'.*outline.*'
+              ]
+              for line in lines:
+                  if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+                      continue
+                  if "NOTE:" in line or line.strip().endswith(":"):
+                      continue
+                  cleaned_lines.append(line)
+              return '\n'.join(cleaned_lines).strip()
+
+          def generate_story_part(point, context, index):
+              prompt = (
+                  f"You are a professional storyteller.\n"
+                  f"Focus: Write at least 500 words for the current outline point.\n"
+                  f"Instructions: Emphasize consistency in characters, tone, and events.\n"
+                  f"{'This is the beginning of the story. Start as if nothing has happened yet.' if index == 1 else ''}"
+                  f"{'This is the ending. Conclude the story naturally and meaningfully.' if index == 10 else ''}\n"
+                  f"Based on the outline point below, continue the story coherently using the context provided.\n"
+                  f"Outline Point: {point}\n\n"
+                  f"Previous Story Context:\n{context}\n\n"
+                  f"Please ONLY provide the story narrative in plain text.\n"
+                  f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
+                  f"Write naturally and engagingly as if for a novel or screenplay.\n"
+              )
+              data = {
+                  "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+                  "messages": [
+                      {"role": "user", "content": prompt}
+                  ]
+              }
+
+              response = requests.post(url, headers=headers, data=json.dumps(data))
+              if response.status_code == 200:
+                  result = response.json()
+                  raw_story = result['choices'][0]['message']['content']
+                  return clean_story_output(raw_story)
+              else:
+                  print(f"Error {response.status_code}: {response.text}")
+                  return None
+
+          def main():
+              full_story = ""
+              for idx, point in enumerate(outline_points, start=1):
+                  print(f"--- Generating story part {idx} ---")
+                  story_part = generate_story_part(point, full_story, idx)
+                  if story_part:
+                      print(story_part)
+                      print("\n")
+                      full_story += "\n" + story_part
+                      time.sleep(2)
+                  else:
+                      print(f"Failed to generate part {idx}. Stopping.")
+                      break
+              print("--- FULL STORY GENERATED ---")
+
+          if __name__ == "__main__":
+              main()
+          EOF
