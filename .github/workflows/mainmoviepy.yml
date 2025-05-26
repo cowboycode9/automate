@@ -24,26 +24,55 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install moviepy
+      - name: Install system dependencies
         run: |
-          pip install moviepy
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install moviepy imageio imageio-ffmpeg
+          pip list | grep -E "(moviepy|imageio)"
+
+      - name: Verify files exist
+        run: |
+          ls -la
+          ls -la Images/ || echo "Images directory not found"
+          ls -la *.mp3 || echo "No mp3 files found"
 
       - name: Create video from image and audio using moviepy
         run: |
           mkdir -p Videos
-          cat > create_video.py << 'EOF'
-          from moviepy.editor import AudioFileClip, ImageClip
-
-          image_path = 'Images/generated_image_1.png'
-          audio_path = 'generated_story.mp3'
-          output_path = 'Videos/final_video.mp4'
-
-          audio_clip = AudioFileClip(audio_path)
-          image_clip = ImageClip(image_path).set_duration(audio_clip.duration).set_audio(audio_clip)
-          video = image_clip.resize((1920, 1080)).set_fps(24)
-          video.write_videofile(output_path, codec='libx264', audio_codec='aac', preset='ultrafast')
-          EOF
-          python create_video.py
+          python3 -c "
+import sys
+print('Python version:', sys.version)
+try:
+    from moviepy.editor import AudioFileClip, ImageClip
+    print('MoviePy imported successfully')
+    
+    image_path = 'Images/generated_image_1.png'
+    audio_path = 'generated_story.mp3'
+    output_path = 'Videos/final_video.mp4'
+    
+    print(f'Loading audio from: {audio_path}')
+    audio_clip = AudioFileClip(audio_path)
+    print(f'Audio duration: {audio_clip.duration} seconds')
+    
+    print(f'Loading image from: {image_path}')
+    image_clip = ImageClip(image_path).set_duration(audio_clip.duration).set_audio(audio_clip)
+    
+    print('Creating video...')
+    video = image_clip.resize((1920, 1080)).set_fps(24)
+    video.write_videofile(output_path, codec='libx264', audio_codec='aac', preset='ultrafast', verbose=False, logger=None)
+    print(f'Video created successfully: {output_path}')
+    
+except Exception as e:
+    print(f'Error: {e}')
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+"
 
       - name: Set up Git identity
         run: |
