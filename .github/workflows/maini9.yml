@@ -1,17 +1,17 @@
-name: Generate Image Prompt
+name: Generate Image Prompt from Story
 
 on:
   workflow_dispatch:
 
 jobs:
-  prompt-creation:
+  generate-prompt:
     runs-on: ubuntu-latest
 
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -19,35 +19,39 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: pip install requests
 
-      - name: Generate Image Prompt
+      - name: Generate image prompt
         run: |
           python3 - <<EOF
           import os
           import requests
           import json
 
-          STORY_FILE_PATH = "scriptgen/generated_story.txt"
-          with open(STORY_FILE_PATH, "r", encoding="utf-8") as f:
-              story_text = f.read()
-
           url = "https://openrouter.ai/api/v1/chat/completions"
           headers = {
               "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
               "Content-Type": "application/json",
               "HTTP-Referer": "https://your-site.com",
-              "X-Title": "Visual Prompt Gen"
+              "X-Title": "Image Prompt Creator"
           }
 
+          STORY_FILE_PATH = "generated_story.txt"
+
+          try:
+              with open(STORY_FILE_PATH, "r", encoding="utf-8") as f:
+                  story = f.read()
+          except FileNotFoundError:
+              print("Story file not found.")
+              exit(1)
+
           prompt = (
-              "You are a visual artist assistant. Read the story below and identify the most dramatic, cinematic, or emotionally intense scene. "
-              "Then describe it as a single image generation prompt for an AI model. "
-              "Include only important visual elements like character actions, setting, clothing, mood, time of day, lighting, and composition. "
-              "Avoid extra words. Use a professional prompt style.\n\n"
-              f"Story:\n{story_text}\n\n"
-              "Provide only the prompt:"
+              "You are a creative prompt engineer for AI-generated visuals.\n"
+              "Given the story below, write a single detailed and vivid prompt that captures the most dramatic, cinematic, or emotional moment in the story, "
+              "or a visual concept based on its title. Use visual keywords suitable for an image generation model like Midjourney or Stable Diffusion.\n"
+              "Do not include any story explanations, just the raw image prompt.\n\n"
+              f"STORY:\n{story}"
           )
 
           data = {
@@ -58,19 +62,13 @@ jobs:
           }
 
           response = requests.post(url, headers=headers, data=json.dumps(data))
+
           if response.status_code == 200:
-              prompt_text = response.json()['choices'][0]['message']['content'].strip()
-              with open("scriptgen/image_prompt.txt", "w", encoding="utf-8") as out:
-                  out.write(prompt_text)
-              print("Image prompt saved.")
+              result = response.json()
+              image_prompt = result["choices"][0]["message"]["content"]
+              print("=== Generated Image Prompt ===")
+              print(image_prompt.strip())
           else:
               print(f"Error {response.status_code}: {response.text}")
+              exit(1)
           EOF
-
-      - name: Commit and Push Prompt
-        run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add scriptgen/image_prompt.txt
-          git commit -m "Add generated image prompt"
-          git push
