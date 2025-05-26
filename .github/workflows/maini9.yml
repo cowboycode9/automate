@@ -1,0 +1,89 @@
+name: Generate Image Prompts from Story
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract-prompts:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Extract Visual Prompts from Story
+      env:
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      run: |
+        python3 - <<EOF
+        import os
+        import json
+        import requests
+
+        story_path = "generated_story.txt"
+        if not os.path.exists(story_path):
+            raise FileNotFoundError("Story file not found.")
+
+        with open(story_path, "r", encoding="utf-8") as f:
+            story_text = f.read()
+
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://your-site.com",
+            "X-Title": "Story Visual Prompt Extractor"
+        }
+
+        prompt = (
+            "You are a professional visual content designer for emotional and dramatic YouTube videos.\n"
+            "Analyze the story below and extract 3 strong visual prompts that can be used to generate images for thumbnails.\n"
+            "Each prompt must focus on a dramatic moment, key character action, or the type of image you'd expect from a story-based video title.\n\n"
+            "Format:\n1. <Prompt>\n2. <Prompt>\n3. <Prompt>\n\n"
+            "Story:\n" + story_text
+        )
+
+        data = {
+            "model": "mistralai/mixtral-8x7b-instruct:free",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        if response.status_code == 200:
+            result = response.json()
+            prompts_text = result["choices"][0]["message"]["content"]
+            print("=== Image Prompts ===")
+            print(prompts_text)
+
+            # Save to file
+            with open("image_prompts.txt", "w", encoding="utf-8") as out_file:
+                out_file.write(prompts_text)
+
+        else:
+            print(f"Error {response.status_code}: {response.text}")
+            exit(1)
+        EOF
+
+    - name: Commit and push image prompts
+      env:
+        GIT_TOKEN: ${{ secrets.GH_PAT }}
+      run: |
+        git config --global user.name "ansentase"
+        git config --global user.email "samomsan7@gmail.com"
+        git add image_prompts.txt
+        git commit -m "Generated image prompts from story"
+        git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+        git push
