@@ -1,89 +1,76 @@
-name: Generate Image Prompts from Story
+name: Generate Image Prompt
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  extract-prompts:
+  prompt-creation:
     runs-on: ubuntu-latest
 
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install requests
+      - name: Install Dependencies
+        run: pip install requests
 
-    - name: Extract Visual Prompts from Story
-      env:
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      run: |
-        python3 - <<EOF
-        import os
-        import json
-        import requests
+      - name: Generate Image Prompt
+        run: |
+          python3 - <<EOF
+          import os
+          import requests
+          import json
 
-        story_path = "generated_story.txt"
-        if not os.path.exists(story_path):
-            raise FileNotFoundError("Story file not found.")
+          STORY_FILE_PATH = "scriptgen/generated_story.txt"
+          with open(STORY_FILE_PATH, "r", encoding="utf-8") as f:
+              story_text = f.read()
 
-        with open(story_path, "r", encoding="utf-8") as f:
-            story_text = f.read()
+          url = "https://openrouter.ai/api/v1/chat/completions"
+          headers = {
+              "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://your-site.com",
+              "X-Title": "Visual Prompt Gen"
+          }
 
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://your-site.com",
-            "X-Title": "Story Visual Prompt Extractor"
-        }
+          prompt = (
+              "You are a visual artist assistant. Read the story below and identify the most dramatic, cinematic, or emotionally intense scene. "
+              "Then describe it as a single image generation prompt for an AI model. "
+              "Include only important visual elements like character actions, setting, clothing, mood, time of day, lighting, and composition. "
+              "Avoid extra words. Use a professional prompt style.\n\n"
+              f"Story:\n{story_text}\n\n"
+              "Provide only the prompt:"
+          )
 
-        prompt = (
-            "You are a professional visual content designer for emotional and dramatic YouTube videos.\n"
-            "Analyze the story below and extract 3 strong visual prompts that can be used to generate images for thumbnails.\n"
-            "Each prompt must focus on a dramatic moment, key character action, or the type of image you'd expect from a story-based video title.\n\n"
-            "Format:\n1. <Prompt>\n2. <Prompt>\n3. <Prompt>\n\n"
-            "Story:\n" + story_text
-        )
+          data = {
+              "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+              "messages": [
+                  {"role": "user", "content": prompt}
+              ]
+          }
 
-        data = {
-            "model": "mistralai/mixtral-8x7b-instruct:free",
-            "messages": [{"role": "user", "content": prompt}]
-        }
+          response = requests.post(url, headers=headers, data=json.dumps(data))
+          if response.status_code == 200:
+              prompt_text = response.json()['choices'][0]['message']['content'].strip()
+              with open("scriptgen/image_prompt.txt", "w", encoding="utf-8") as out:
+                  out.write(prompt_text)
+              print("Image prompt saved.")
+          else:
+              print(f"Error {response.status_code}: {response.text}")
+          EOF
 
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        if response.status_code == 200:
-            result = response.json()
-            prompts_text = result["choices"][0]["message"]["content"]
-            print("=== Image Prompts ===")
-            print(prompts_text)
-
-            # Save to file
-            with open("image_prompts.txt", "w", encoding="utf-8") as out_file:
-                out_file.write(prompts_text)
-
-        else:
-            print(f"Error {response.status_code}: {response.text}")
-            exit(1)
-        EOF
-
-    - name: Commit and push image prompts
-      env:
-        GIT_TOKEN: ${{ secrets.GH_PAT }}
-      run: |
-        git config --global user.name "ansentase"
-        git config --global user.email "samomsan7@gmail.com"
-        git add image_prompts.txt
-        git commit -m "Generated image prompts from story"
-        git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
-        git push
+      - name: Commit and Push Prompt
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add scriptgen/image_prompt.txt
+          git commit -m "Add generated image prompt"
+          git push
