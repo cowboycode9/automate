@@ -3,6 +3,9 @@ name: Create Final Video
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   create_video:
     runs-on: ubuntu-latest
@@ -14,7 +17,7 @@ jobs:
           lfs: true
           token: ${{ secrets.GH_PAT }}
 
-      - name: Install Git LFS and pull large files
+      - name: Install Git LFS and Pull LFS files
         run: |
           git lfs install
           git lfs pull
@@ -26,28 +29,26 @@ jobs:
 
       - name: Create video from image and audio
         run: |
-          mkdir -p Videos
-          ffmpeg -loop 1 -y -i Images/generated_image_1.png -i generated_story.mp3 \
-            -c:v libx264 -tune stillimage -c:a aac -b:a 192k -shortest \
-            -pix_fmt yuv420p -vf scale=1920:1080 \
-            Videos/final_video.mp4
+          mkdir -p video_output
+          ffmpeg -loop 1 -i Images/generated_image_1.png -i generated_story.mp3 \
+            -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p \
+            -shortest -movflags +faststart video_output/final_video.mp4
 
       - name: Set up Git identity
         run: |
           git config --global user.name "ansentase"
           git config --global user.email "samomsan7@gmail.com"
 
-      - name: Track video with Git LFS
+      - name: Track video file with Git LFS
         run: |
-          git lfs track "Videos/*.mp4"
+          git lfs track "video_output/final_video.mp4"
           git add .gitattributes
 
       - name: Commit and push final video
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          git add Videos/final_video.mp4
-          timestamp=$(date -u)
-          git commit -m "Add final video: ${timestamp}" || echo "No changes to commit"
-          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git
-          git push
+          git add video_output/final_video.mp4
+          timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          git commit -m "Generated final video: ${timestamp}" || echo "No changes to commit"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
