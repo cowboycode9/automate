@@ -19,21 +19,19 @@ jobs:
           git lfs install
           git lfs pull
 
-      - name: Set up Python and install pymovie
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install pymovie dependencies
+      - name: Install moviepy
         run: |
-          pip install pymovie moviepy
+          pip install moviepy
 
-      - name: Create video using pymovie
+      - name: Create video from image and audio using moviepy
         run: |
           mkdir -p Videos
-          echo "
-import os
-from pymovie import Movie
+          cat > create_video.py << 'EOF'
 from moviepy.editor import AudioFileClip, ImageClip
 
 image_path = 'Images/generated_image_1.png'
@@ -44,7 +42,7 @@ audio_clip = AudioFileClip(audio_path)
 image_clip = ImageClip(image_path).set_duration(audio_clip.duration).set_audio(audio_clip)
 video = image_clip.resize((1920, 1080)).set_fps(24)
 video.write_videofile(output_path, codec='libx264', audio_codec='aac', preset='ultrafast')
-" > create_video.py
+EOF
           python create_video.py
 
       - name: Set up Git identity
