@@ -1,0 +1,118 @@
+name: Generate Story from Hardcoded Outline
+
+on:
+  workflow_dispatch:
+
+jobs:
+  generate-story:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run Story Generator and Save to File
+      env:
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      run: |
+        echo "Generating story..."
+        python3 - <<EOF
+import os
+import json
+import time
+import requests
+import re
+from datetime import datetime
+
+outline_text = """Protagonist receives a mysterious letter with no return address.
+The letter warns of a danger that will strike in 24 hours.
+Protagonist initially ignores it but strange events start happening.
+A shadowy figure is spotted following the protagonist.
+Protagonist discovers a hidden symbol on the letter using heat.
+The symbol leads to an abandoned building with a hidden room.
+Inside, they find newspaper clippings of people who vanished mysteriously.
+Protagonist realizes they are the next target.
+A confrontation occurs with the antagonist who sent the letter as a test.
+Twist ending: The protagonist passes the test and is recruited into a secret organization."""
+
+outline_points = [line.strip() for line in outline_text.strip().split("\\n") if line.strip()]
+url = "https://openrouter.ai/api/v1/chat/completions"
+headers = {
+    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+    "Content-Type": "application/json",
+    "HTTP-Referer": "https://your-site.com",
+    "X-Title": "Story Generator"
+}
+
+def clean_story_output(raw_text):
+    lines = raw_text.splitlines()
+    cleaned_lines = []
+    skip_patterns = [
+        r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+        r'.*outline.*'
+    ]
+    for line in lines:
+        if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+            continue
+        if "NOTE:" in line or line.strip().endswith(":"):
+            continue
+        cleaned_lines.append(line)
+    return '\\n'.join(cleaned_lines).strip()
+
+def generate_story_part(point, context):
+    prompt = (
+        f"You are a professional storyteller.\\n"
+        f"Based on the outline point below, continue the story coherently using the context provided.\\n"
+        f"Outline Point: {point}\\n\\n"
+        f"Previous Story Context:\\n{context}\\n\\n"
+        f"Focus: Write at least 500 words for the current outline point.\\n"
+        f"Instructions: Emphasize consistency in characters, tone, and events.\\n"
+        f"Please ONLY provide the story narrative in plain text.\\n"
+        f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+        f"Write naturally and engagingly as if for a novel or screenplay.\\n"
+    )
+    data = {
+        "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+    if response.status_code == 200:
+        result = response.json()
+        raw_story = result['choices'][0]['message']['content']
+        return clean_story_output(raw_story)
+    else:
+        print(f"Error {response.status_code}: {response.text}")
+        return None
+
+def main():
+    full_story = ""
+    for idx, point in enumerate(outline_points, start=1):
+        print(f"--- Generating story part {idx} ---")
+        story_part = generate_story_part(point, full_story)
+        if story_part:
+            print(story_part)
+            full_story += "\\n\\n" + story_part
+            time.sleep(2)
+        else:
+            print(f"Failed to generate part {idx}. Stopping.")
+            break
+
+    # Save to a text file
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    output_filename = f"story_output_{timestamp}.txt"
+    with open(output_filename, "w") as f:
+        f.write(full_story.strip())
+    print(f"Saved story to {output_filename}")
+
+main()
+EOF
+
+    - name: Commit and push story file
+      run: |
+        git config user.name "ansentase"
+        git config user.email "samomsan7@gmail.com"
+        git add story_output_*.txt
+        git commit -m "Add generated story"
+        git push
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
