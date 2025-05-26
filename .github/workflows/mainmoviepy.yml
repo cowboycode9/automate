@@ -1,0 +1,67 @@
+name: Create Final Video
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create_video:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Install Git LFS and pull large files
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Set up Python and install pymovie
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install pymovie dependencies
+        run: |
+          pip install pymovie moviepy
+
+      - name: Create video using pymovie
+        run: |
+          mkdir -p Videos
+          python -c "
+import os
+from pymovie import Movie
+from moviepy.editor import AudioFileClip, ImageClip
+
+image_path = 'Images/generated_image_1.png'
+audio_path = 'generated_story.mp3'
+output_path = 'Videos/final_video.mp4'
+
+audio_clip = AudioFileClip(audio_path)
+image_clip = ImageClip(image_path).set_duration(audio_clip.duration).set_audio(audio_clip)
+video = image_clip.resize((1920, 1080)).set_fps(24)
+video.write_videofile(output_path, codec='libx264', audio_codec='aac', preset='ultrafast')
+"
+
+      - name: Set up Git identity
+        run: |
+          git config --global user.name "ansentase"
+          git config --global user.email "samomsan7@gmail.com"
+
+      - name: Track video with Git LFS
+        run: |
+          git lfs track "Videos/*.mp4"
+          git add .gitattributes
+
+      - name: Commit and push final video
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git add Videos/final_video.mp4
+          timestamp=$(date -u)
+          git commit -m "Add final video: ${timestamp}" || echo "No changes to commit"
+          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git
+          git push
