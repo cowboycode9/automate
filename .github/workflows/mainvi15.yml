@@ -1,0 +1,53 @@
+name: Create Final Video
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create_video:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Install Git LFS and pull large files
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Create video from image and audio
+        run: |
+          mkdir -p Videos
+          ffmpeg -loop 1 -y -i Images/generated_image_1.png -i generated_story.mp3 \
+            -c:v libx264 -tune stillimage -c:a aac -b:a 192k -shortest \
+            -pix_fmt yuv420p -vf scale=1920:1080 \
+            Videos/final_video.mp4
+
+      - name: Set up Git identity
+        run: |
+          git config --global user.name "ansentase"
+          git config --global user.email "samomsan7@gmail.com"
+
+      - name: Track video with Git LFS
+        run: |
+          git lfs track "Videos/*.mp4"
+          git add .gitattributes
+
+      - name: Commit and push final video
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git add Videos/final_video.mp4
+          timestamp=$(date -u)
+          git commit -m "Add final video: ${timestamp}" || echo "No changes to commit"
+          git remote set-url origin https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git
+          git push
