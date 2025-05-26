@@ -32,17 +32,17 @@ jobs:
         run: |
           mkdir -p Videos
           cat > create_video.py << 'EOF'
-from moviepy.editor import AudioFileClip, ImageClip
+          from moviepy.editor import AudioFileClip, ImageClip
 
-image_path = 'Images/generated_image_1.png'
-audio_path = 'generated_story.mp3'
-output_path = 'Videos/final_video.mp4'
+          image_path = 'Images/generated_image_1.png'
+          audio_path = 'generated_story.mp3'
+          output_path = 'Videos/final_video.mp4'
 
-audio_clip = AudioFileClip(audio_path)
-image_clip = ImageClip(image_path).set_duration(audio_clip.duration).set_audio(audio_clip)
-video = image_clip.resize((1920, 1080)).set_fps(24)
-video.write_videofile(output_path, codec='libx264', audio_codec='aac', preset='ultrafast')
-EOF
+          audio_clip = AudioFileClip(audio_path)
+          image_clip = ImageClip(image_path).set_duration(audio_clip.duration).set_audio(audio_clip)
+          video = image_clip.resize((1920, 1080)).set_fps(24)
+          video.write_videofile(output_path, codec='libx264', audio_codec='aac', preset='ultrafast')
+          EOF
           python create_video.py
 
       - name: Set up Git identity
