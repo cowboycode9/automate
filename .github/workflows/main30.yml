@@ -1,0 +1,177 @@
+name: Generate Story from Outline
+
+on: workflow_dispatch: inputs: outline_text: description: 'Story outline (each point on a new line)' required: true type: string
+
+permissions: contents: write  # Required for pushing to repo
+
+jobs: generate-story: runs-on: ubuntu-latest
+
+steps:
+- name: Checkout repository
+  uses: actions/checkout@v3
+
+- name: Run Story Generator
+  env:
+    INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}
+    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  run: |
+    python3 - <<EOF
+    import os
+    import json
+    import time
+    import requests
+    import re
+
+    outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")
+    outline_sections = re.split(r'\\n(?=\\d+\\.\\s)', outline_text.strip())
+    outline_points = [section.strip() for section in outline_sections if section.strip()]
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://your-site.com",
+        "X-Title": "Story Generator"
+    }
+
+    def clean_story_output(raw_text):
+        lines = raw_text.splitlines()
+        cleaned_lines = []
+        skip_patterns = [
+            r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+            r'.*outline.*'
+        ]
+        for line in lines:
+            if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+                continue
+            if "NOTE:" in line or line.strip().endswith(":"):
+                continue
+            cleaned_lines.append(line)
+        return '\\n'.join(cleaned_lines).strip()
+
+    def generate_story_part(point, context, index, total):
+        is_first = index == 1
+        is_last = index == total
+
+        base_style_instructions = (
+            "Write in a cinematic, dramatic storytelling style with these specific characteristics:\\n"
+            "- Use present tense throughout the narrative\\n"
+            "- Write with vivid, sensory details that paint clear mental pictures\\n"
+            "- Include dialogue that feels natural and reveals character\\n"
+            "- Build tension through pacing and atmosphere\\n"
+            "- Use short, punchy sentences mixed with longer descriptive ones\\n"
+            "- Show emotions through actions and physical reactions, not just statements\\n"
+            "- Create immersive scenes with specific details about settings, sounds, and atmosphere\\n"
+            "- Write as if narrating a movie or TV drama\\n"
+            "- Include internal thoughts and motivations of characters\\n"
+            "- Use dramatic irony and foreshadowing when appropriate\\n\\n"
+        )
+
+        if is_first:
+            prompt = (
+                f"You are a master storyteller creating an engaging narrative script.\\n\\n"
+                f"{base_style_instructions}"
+                f"This is the opening of the story. Set the scene dramatically and introduce key characters with impact.\\n"
+                f"Start with a hook that grabs attention immediately.\\n"
+                f"Build the world and atmosphere with rich, specific details.\\n\\n"
+                f"Outline Point to develop: {point}\\n\\n"
+                f"Requirements:\\n"
+                f"- Write 600-800 words for this opening section\\n"
+                f"- Establish the protagonist, setting, and central conflict\\n"
+                f"- Use present tense and cinematic language\\n"
+                f"- Create immediate tension and intrigue\\n"
+                f"- Include vivid sensory details and atmospheric descriptions\\n"
+                f"- Write ONLY the story narrative - no titles, headers, or meta-commentary\\n"
+                f"- Make every sentence count toward building drama and engagement\\n\\n"
+                f"Begin the story now:"
+            )
+        elif is_last:
+            prompt = (
+                f"You are a master storyteller crafting the climactic conclusion.\\n\\n"
+                f"{base_style_instructions}"
+                f"This is the final act. Bring all story threads to a powerful, emotionally satisfying conclusion.\\n"
+                f"Resolve conflicts with impact and meaning.\\n"
+                f"Show character transformation and growth.\\n\\n"
+                f"Outline Point to develop: {point}\\n\\n"
+                f"Previous Story Context (maintain consistency):\\n{context}\\n\\n"
+                f"Requirements:\\n"
+                f"- Write 600-800 words for this conclusion\\n"
+                f"- Resolve all major plot threads established earlier\\n"
+                f"- Show the aftermath and consequences of earlier events\\n"
+                f"- Maintain character voices and story tone from previous sections\\n"
+                f"- Create emotional resonance and lasting impact\\n"
+                f"- Use present tense and maintain the cinematic style\\n"
+                f"- Write ONLY the story narrative - no titles, headers, or commentary\\n\\n"
+                f"Continue and conclude the story:"
+            )
+        else:
+            prompt = (
+                f"You are a master storyteller developing the story's middle section.\\n\\n"
+                f"{base_style_instructions}"
+                f"Build upon the established narrative while escalating tension and developing characters.\\n"
+                f"This section should advance the plot significantly and deepen reader engagement.\\n\\n"
+                f"Outline Point to develop: {point}\\n\\n"
+                f"Previous Story Context (maintain consistency):\\n{context}\\n\\n"
+                f"Requirements:\\n"
+                f"- Write 600-800 words for this section\\n"
+                f"- Maintain character consistency with previous sections\\n"
+                f"- Escalate tension and stakes from where the story left off\\n"
+                f"- Include compelling dialogue and character interactions\\n"
+                f"- Advance the plot toward the climax\\n"
+                f"- Use present tense and maintain the established cinematic tone\\n"
+                f"- Create smooth transitions from the previous section\\n"
+                f"- Write ONLY the story narrative - no titles, headers, or commentary\\n\\n"
+                f"Continue the story:"
+            )
+
+        data = {
+            "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ]
+        }
+
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        if response.status_code == 200:
+            result = response.json()
+            raw_story = result['choices'][0]['message']['content']
+            return clean_story_output(raw_story)
+        else:
+            print(f"Error {response.status_code}: {response.text}")
+            return None
+
+    def main():
+        full_story = ""
+        total_points = len(outline_points)
+        for idx, point in enumerate(outline_points, start=1):
+            print(f"--- Generating story part {idx} ---")
+            story_part = generate_story_part(point, full_story, idx, total_points)
+            if story_part:
+                print(story_part)
+                print("\\n")
+                full_story += "\\n" + story_part
+                time.sleep(2)
+            else:
+                print(f"Failed to generate part {idx}. Stopping.")
+                break
+
+        with open("generated_story.txt", "w") as f:
+            f.write(full_story.strip())
+
+    if __name__ == "__main__":
+        main()
+    EOF
+
+- name: Set up Git identity
+  run: |
+    git config --global user.name "ansentase"
+    git config --global user.email "samomsan7@gmail.com"
+
+- name: Commit and push generated story
+  env:
+    GH_PAT: ${{ secrets.GH_PAT }}
+  run: |
+    git add generated_story.txt
+    timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+    git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"
+    git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
