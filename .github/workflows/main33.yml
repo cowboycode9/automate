@@ -59,9 +59,10 @@ jobs:
                 r'.*acknowledge.*receipt.*',  # Remove meta instructions
                 r'.*table.*allocation.*',  # Remove table references
                 r'^\\s*A\\).*B\\).*C\\).*',  # Remove multiple choice options
+                r'^\\s*D\\).*SPECIFY.*',  # Remove remaining meta options
+                r'.*generating script part.*',  # Remove generation references
             ]  
             
-            in_stage_direction = False
             for line in lines:  
                 # Skip lines that match skip patterns
                 if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):  
@@ -75,12 +76,27 @@ jobs:
                 line = re.sub(r'\\*([^*]+)\\*', r'\\1', line)  # Remove italics
                 line = re.sub(r'#{1,6}\\s*', '', line)  # Remove headers
                 
+                # Simplify overly complex sentences
+                line = re.sub(r'\\b(utilize|implement|facilitate)\\b', lambda m: {'utilize': 'use', 'implement': 'do', 'facilitate': 'help'}[m.group(1)], line)
+                
+                # Fix contractions for natural speech
+                line = re.sub(r'\\bdo not\\b', "don't", line)
+                line = re.sub(r'\\bcannot\\b', "can't", line)
+                line = re.sub(r'\\bwill not\\b', "won't", line)
+                line = re.sub(r'\\bit is\\b', "it's", line)
+                line = re.sub(r'\\bthat is\\b', "that's", line)
+                line = re.sub(r'\\bhere is\\b', "here's", line)
+                
                 # Skip lines that are just punctuation or very short
                 if len(line.strip()) < 3:
                     continue
                     
                 # Skip lines with meta-commentary
-                if any(word in line.lower() for word in ['note:', 'requirements:', 'section', 'word count', 'please provide', 'acknowledge']):
+                if any(word in line.lower() for word in ['note:', 'requirements:', 'section', 'word count', 'please provide', 'acknowledge', 'specify a different']):
+                    continue
+                    
+                # Skip overly dramatic phrases
+                if any(phrase in line.lower() for phrase in ['storm brewing', 'knife twist', 'silent storm', 'burning eyes']):
                     continue
                     
                 cleaned_lines.append(line.strip())  
@@ -106,6 +122,47 @@ jobs:
                 "- NO formatting symbols (* ** - • # [ ] | etc.)\\n"
                 "- NO section breaks or headers within the content\\n\\n"
             )
+
+            # Conversational YouTube tone prompt
+            conversational_tone_prompt = (
+                "YOUTUBE CONVERSATIONAL TONE REQUIREMENTS:\\n"
+                "- Write like you're talking to a friend over coffee, not writing a novel\\n"
+                "- Use simple, everyday language that anyone can understand\\n"
+                "- Keep sentences SHORT and punchy - average 10-15 words per sentence\\n"
+                "- NO literary descriptions or purple prose - be direct and clear\\n"
+                "- Replace fancy words with simple ones (utilize = use, facilitate = help)\\n"
+                "- Use contractions naturally (don't, can't, won't, here's, that's)\\n"
+                "- Start sentences with simple words (So, Now, But, And, This, Here's)\\n"
+                "- NO overly dramatic language or theatrical descriptions\\n"
+                "- Sound like a real person talking, not a professional narrator\\n"
+                "- Use 'you' to directly address the viewer frequently\\n\\n"
+            )
+
+            # Natural integration prompt
+            natural_integration_prompt = (
+                "NATURAL CONTENT INTEGRATION:\\n"
+                "- Integrate statistics conversationally: 'Here's something crazy...' or 'Get this...'\\n"
+                "- NO formal introductions to data - weave it into the story naturally\\n"
+                "- Replace 'According to experts' with 'Turns out' or 'Here's the thing'\\n"
+                "- Make rhetorical questions sound natural, not forced\\n"
+                "- Use transition phrases that people actually say: 'So here's what happened', 'But wait', 'Now this is where it gets interesting'\\n"
+                "- NO academic or formal language - keep it casual and relatable\\n"
+                "- Make every fact feel like you're sharing a secret with a friend\\n\\n"
+            )
+
+            # Simplification enforcement prompt
+            simplification_prompt = (
+                "MANDATORY SIMPLIFICATION RULES:\\n"
+                "- Maximum sentence length: 20 words\\n"
+                "- NO complex metaphors or elaborate descriptions\\n"
+                "- Replace ALL flowery language with simple, direct statements\\n"
+                "- NO phrases like 'storm brewing in her eyes' - just say 'she looked determined'\\n"
+                "- Cut ALL unnecessary adjectives and adverbs\\n"
+                "- Use active voice, not passive voice\\n"
+                "- Every sentence must pass the 'would I say this to a friend?' test\\n"
+                "- NO poetic language - be practical and straightforward\\n"
+                "- Sound like a regular person telling an interesting story\\n\\n"
+            )"
 
             youtube_script_prompt = (
                 "Write a YouTube script for the given topic that must be started with a powerful Trailer level hook to grab immediate attention. Add a top level hook in the first 30 sec that maintains viewers to watch video from start to end, and then maintain that hook in all over script till end. The script should immediately grab attention and keep viewers hooked. The intro should start by directly proving the video's title claim with a bold and exciting statement. It should make the topic feel important, exclusive, or shocking so that viewers instantly trust that they will get valuable and relevant content. Use simple yet powerful language that builds curiosity and makes them want to keep watching. If possible, include a surprising fact, statistic, or statement that supports the claim. To keep the audience engaged, introduce an element of suspense, danger, mystery, or controversy related to the topic. The goal is to make them feel like they are about to learn something they can't afford to miss. End the intro by teasing what's coming next, making sure the transition into the main content feels natural and exciting. Keep it clear, concise, and full of energy so that viewers stay invested in the video. The tone should match the topic-whether it's thrilling, dramatic, or informative-so that the intro feels like the perfect setup for what's coming next\\n\\n"
@@ -233,53 +290,4 @@ jobs:
                 cleaned_story = clean_story_output(raw_story)
                 
                 # Additional cleaning for voiceover readiness
-                cleaned_story = re.sub(r'\\n\\s*\\n\\s*\\n+', '\\n\\n', cleaned_story)  # Remove excessive line breaks
-                cleaned_story = re.sub(r'^\\s*---.*$', '', cleaned_story, flags=re.MULTILINE)  # Remove section dividers
-                cleaned_story = re.sub(r'\\bPart \\d+\\b', '', cleaned_story)  # Remove part references
-                
-                return cleaned_story
-            else:  
-                print(f"Error {response.status_code}: {response.text}")  
-                return None  
-
-        def main():  
-            full_story = ""  
-            total_points = len(outline_points)  
-            for idx, point in enumerate(outline_points, start=1):  
-                print(f"--- Generating script part {idx} ---")  
-                story_part = generate_story_part(point, full_story, idx, total_points)  
-                if story_part:  
-                    print(story_part)  
-                    print("\\n")  
-                    full_story += "\\n\\n" + story_part  
-                    time.sleep(2)  
-                else:  
-                    print(f"Failed to generate part {idx}. Stopping.")  
-                    break  
-
-            # Final cleaning pass for the complete story
-            full_story = full_story.strip()
-            full_story = re.sub(r'\\n{3,}', '\\n\\n', full_story)  # Normalize spacing
-            full_story = re.sub(r'^\\s*[-•*].*$', '', full_story, flags=re.MULTILINE)  # Remove any remaining bullets
-            full_story = re.sub(r'\\([^)]*\\)', '', full_story)  # Remove any remaining parentheticals
-            
-            with open("generated_story.txt", "w") as f:  
-                f.write(full_story)  
-
-        if __name__ == "__main__":  
-            main()  
-        EOF  
-
-    - name: Set up Git identity  
-      run: |  
-        git config --global user.name "ansentase"  
-        git config --global user.email "samomsan7@gmail.com"  
-
-    - name: Commit and push generated story  
-      env:  
-        GH_PAT: ${{ secrets.GH_PAT }}  
-      run: |  
-        git add generated_story.txt  
-        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")  
-        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"  
-        git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
+                cleaned_story = re.sub(r'\\n\\s*\\n\\s*\\n+', '\\n\\n', clean
