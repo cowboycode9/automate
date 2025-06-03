@@ -4,12 +4,42 @@ import time
 import requests
 import re
 
+# Debug: Print environment variable to check if it's being passed
+print("DEBUG: INPUT_OUTLINE_TEXT environment variable:")
 outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")
+print(f"Length: {len(outline_text)}")
+print(f"First 200 chars: {outline_text[:200]}...")
+
+# Check if outline_text is empty and exit early if so
+if not outline_text.strip():
+    print("ERROR: INPUT_OUTLINE_TEXT environment variable is empty or not set!")
+    print("Please check your GitHub Actions workflow and Google Apps Script.")
+    exit(1)
+
 outline_points = [line.strip() for line in outline_text.strip().split("\n") if line.strip()]
 
+# Debug: Print parsed outline points
+print(f"DEBUG: Found {len(outline_points)} outline points:")
+for i, point in enumerate(outline_points[:3], 1):  # Show first 3 points
+    print(f"{i}. {point[:100]}...")
+
+# Check if we have any outline points
+if not outline_points:
+    print("ERROR: No outline points found after parsing!")
+    print("Raw outline text:")
+    print(repr(outline_text))
+    exit(1)
+
 url = "https://openrouter.ai/api/v1/chat/completions"
+
+# Check if API key is set
+api_key = os.getenv('OPENROUTER_API_KEY')
+if not api_key:
+    print("ERROR: OPENROUTER_API_KEY environment variable is not set!")
+    exit(1)
+
 headers = {
-    "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+    "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",
     "HTTP-Referer": "https://your-site.com",
     "X-Title": "Story Generator"
@@ -229,32 +259,53 @@ def generate_story_part(point, context, index, total):
         ]  
     }  
 
-    response = requests.post(url, headers=headers, data=json.dumps(data))  
-    if response.status_code == 200:  
-        result = response.json()  
-        raw_story = result['choices'][0]['message']['content']  
-        return clean_story_output(raw_story)  
-    else:  
-        print(f"Error {response.status_code}: {response.text}")  
-        return None  
+    print(f"Making API request for part {index}...")
+    
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(data), timeout=60)
+        if response.status_code == 200:  
+            result = response.json()  
+            raw_story = result['choices'][0]['message']['content']  
+            cleaned_story = clean_story_output(raw_story)
+            print(f"Successfully generated part {index} ({len(cleaned_story)} characters)")
+            return cleaned_story  
+        else:  
+            print(f"API Error {response.status_code}: {response.text}")  
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Request failed for part {index}: {str(e)}")
+        return None
   
 def main():  
     full_story = ""  
     total_points = len(outline_points)  
+    
+    print(f"Starting story generation with {total_points} parts...")
+    
     for idx, point in enumerate(outline_points, start=1):  
-        print(f"--- Generating story part {idx} ---")  
+        print(f"--- Generating story part {idx}/{total_points} ---")
+        print(f"Working on: {point[:100]}...")
+        
         story_part = generate_story_part(point, full_story, idx, total_points)  
         if story_part:  
-            print(story_part)  
+            print(f"Part {idx} generated successfully!")
+            print("=" * 50)
+            print(story_part[:200] + "..." if len(story_part) > 200 else story_part)
+            print("=" * 50)
             print("\n")  
             full_story += "\n" + story_part  
             time.sleep(2)  
         else:  
             print(f"Failed to generate part {idx}. Stopping.")  
             break  
-  
-    with open("generated_story.txt", "w") as f:  
-        f.write(full_story.strip())  
+    
+    if full_story.strip():
+        with open("generated_story.txt", "w") as f:  
+            f.write(full_story.strip())
+        print(f"Story generation completed! Total length: {len(full_story)} characters")
+        print("Story saved to 'generated_story.txt'")
+    else:
+        print("No story content was generated!")
   
 if __name__ == "__main__":  
     main()
