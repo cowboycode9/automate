@@ -162,7 +162,7 @@ jobs:
                 "- Every sentence must pass the 'would I say this to a friend?' test\\n"
                 "- NO poetic language - be practical and straightforward\\n"
                 "- Sound like a regular person telling an interesting story\\n\\n"
-            )"
+            )
 
             youtube_script_prompt = (
                 "Write a YouTube script for the given topic that must be started with a powerful Trailer level hook to grab immediate attention. Add a top level hook in the first 30 sec that maintains viewers to watch video from start to end, and then maintain that hook in all over script till end. The script should immediately grab attention and keep viewers hooked. The intro should start by directly proving the video's title claim with a bold and exciting statement. It should make the topic feel important, exclusive, or shocking so that viewers instantly trust that they will get valuable and relevant content. Use simple yet powerful language that builds curiosity and makes them want to keep watching. If possible, include a surprising fact, statistic, or statement that supports the claim. To keep the audience engaged, introduce an element of suspense, danger, mystery, or controversy related to the topic. The goal is to make them feel like they are about to learn something they can't afford to miss. End the intro by teasing what's coming next, making sure the transition into the main content feels natural and exciting. Keep it clear, concise, and full of energy so that viewers stay invested in the video. The tone should match the topic-whether it's thrilling, dramatic, or informative-so that the intro feels like the perfect setup for what's coming next\\n\\n"
@@ -216,64 +216,69 @@ jobs:
             if is_first:  
                 prompt = (  
                     f"{voiceover_ready_prompt}"
-                    f"{narrative_flow_prompt}"
-                    f"{completion_prompt}"
+                    f"{conversational_tone_prompt}"
+                    f"{natural_integration_prompt}"
+                    f"{simplification_prompt}"
                     f"You are a master YouTube script writer creating an engaging 5000-word video script.\\n\\n"  
                     f"{youtube_script_prompt}"  
-                    f"This is the opening section of the script. Write as a YouTube narrator telling the story directly to viewers.\\n"  
-                    f"NO character dialogue - describe what Elena and others did and said.\\n"
-                    f"Start with immediate impact and maintain engagement throughout.\\n\\n"  
+                    f"This is the opening section of the script. Write like you're talking to a friend, not writing literature.\\n"  
+                    f"Keep sentences SHORT and punchy. NO flowery descriptions or dramatic language.\\n"
+                    f"Tell Elena's story conversationally - like you're sharing gossip with a friend.\\n\\n"  
                     f"Topic/Outline Point to develop: {point}\\n\\n"  
                     f"OPENING SECTION REQUIREMENTS:\\n"  
-                    f"- Write 1200-1500 words of pure conversational narrative\\n"  
-                    f"- Start with powerful hook that grabs attention immediately\\n"  
-                    f"- Tell Elena's story as narrator, not through character scenes\\n"  
-                    f"- Use natural speaking rhythm with varied sentence lengths\\n"  
-                    f"- Build curiosity and maintain viewer interest throughout\\n"  
-                    f"- Complete this section fully - no placeholders or outlines\\n"  
+                    f"- Write 1200-1500 words in simple, conversational language\\n"  
+                    f"- Start with immediate hook - no fancy scene setting\\n"  
+                    f"- Use short sentences (10-15 words max)\\n"  
+                    f"- Sound like a regular person telling an interesting story\\n"  
+                    f"- NO theatrical language or purple prose\\n"  
+                    f"- Integrate facts naturally like sharing secrets\\n"  
+                    f"- Use contractions and casual language throughout\\n"  
                     f"- Write ONLY speakable script content\\n\\n"  
-                    f"Begin the YouTube script with immediate narrative impact:"  
+                    f"Begin the YouTube script with conversational storytelling:"  
                 )  
             elif is_last:  
                 prompt = (  
                     f"{voiceover_ready_prompt}"
-                    f"{narrative_flow_prompt}"
-                    f"{completion_prompt}"
+                    f"{conversational_tone_prompt}"
+                    f"{natural_integration_prompt}"
+                    f"{simplification_prompt}"
                     f"You are a master YouTube script writer crafting the conclusion section.\\n\\n"  
                     f"{youtube_script_prompt}"  
-                    f"This is the final section. Bring everything to a powerful conclusion with genius call-to-action.\\n"  
-                    f"Continue the narrator voice established in previous sections.\\n\\n"  
+                    f"This is the final section. Keep the same casual, friendly tone from previous sections.\\n"  
+                    f"Wrap up Elena's story like you're finishing a conversation with a friend.\\n\\n"  
                     f"Topic/Outline Point to develop: {point}\\n\\n"  
                     f"Previous Script Context (maintain consistency):\\n{context[-1000:]}\\n\\n"  
                     f"CONCLUSION REQUIREMENTS:\\n"  
-                    f"- Write 1200-1500 words of conversational narrative\\n"  
-                    f"- Resolve all mysteries and complete Elena's story\\n"  
-                    f"- Include genius call-to-action relevant to the topic\\n"  
-                    f"- Maintain same narrator voice from previous sections\\n"  
-                    f"- Provide satisfying conclusion and emotional impact\\n"  
+                    f"- Write 1200-1500 words in simple, conversational language\\n"  
+                    f"- Wrap up Elena's story naturally and casually\\n"  
+                    f"- Include genius call-to-action that feels natural\\n"  
+                    f"- Keep same friendly, casual tone throughout\\n"  
+                    f"- NO fancy conclusions - just wrap it up like a friend would\\n"  
+                    f"- Use short, punchy sentences\\n"  
                     f"- Write ONLY speakable script content\\n\\n"  
-                    f"Continue and conclude the YouTube script:"  
+                    f"Continue and conclude the YouTube script naturally:"  
                 )  
             else:  
                 prompt = (  
                     f"{voiceover_ready_prompt}"
-                    f"{narrative_flow_prompt}"
-                    f"{completion_prompt}"
+                    f"{conversational_tone_prompt}"
+                    f"{natural_integration_prompt}"
+                    f"{simplification_prompt}"
                     f"You are a master YouTube script writer developing the middle section.\\n\\n"  
                     f"{youtube_script_prompt}"  
-                    f"Continue the established narrator voice while advancing Elena's story.\\n"  
-                    f"Maintain engagement and build toward the conclusion.\\n\\n"  
+                    f"Continue Elena's story with the same casual, friendly tone.\\n"  
+                    f"Keep sentences short and conversational throughout.\\n\\n"  
                     f"Topic/Outline Point to develop: {point}\\n\\n"  
                     f"Previous Script Context (maintain consistency):\\n{context[-1000:]}\\n\\n"  
                     f"MIDDLE SECTION REQUIREMENTS:\\n"  
-                    f"- Write 1200-1500 words of conversational narrative\\n"  
-                    f"- Continue same narrator voice from previous sections\\n"  
-                    f"- Advance Elena's story with engaging details\\n"  
-                    f"- Include research, statistics, and expert insights naturally\\n"  
-                    f"- Use rhetorical questions and engaging elements\\n"  
-                    f"- Create smooth transitions and maintain interest\\n"  
+                    f"- Write 1200-1500 words in simple, conversational language\\n"  
+                    f"- Continue Elena's story like you're chatting with a friend\\n"  
+                    f"- Integrate research and facts naturally, not formally\\n"  
+                    f"- Use casual transitions: 'So here's what happened', 'But wait'\\n"  
+                    f"- Keep sentences short and punchy (10-15 words)\\n"  
+                    f"- NO literary descriptions - just tell the story simply\\n"  
                     f"- Write ONLY speakable script content\\n\\n"  
-                    f"Continue the YouTube script:"  
+                    f"Continue the YouTube script conversationally:"  
                 )  
 
             data = {  
@@ -285,9 +290,4 @@ jobs:
 
             response = requests.post(url, headers=headers, data=json.dumps(data))  
             if response.status_code == 200:  
-                result = response.json()  
-                raw_story = result['choices'][0]['message']['content']  
-                cleaned_story = clean_story_output(raw_story)
-                
-                # Additional cleaning for voiceover readiness
-                cleaned_story = re.sub(r'\\n\\s*\\n\\s*\\n+', '\\n\\n', clean
+    
