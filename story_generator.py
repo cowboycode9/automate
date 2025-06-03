@@ -5,7 +5,24 @@ import requests
 import re
 
 outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")
-outline_points = [line.strip() for line in outline_text.strip().split("\n") if line.strip()]
+# Better outline parsing - split by numbered points
+import re
+outline_points = []
+current_point = ""
+for line in outline_text.strip().split("\n"):
+    line = line.strip()
+    if not line:
+        continue
+    # Check if line starts with a number (new point)
+    if re.match(r'^\d+\.', line):
+        if current_point:
+            outline_points.append(current_point.strip())
+        current_point = line
+    else:
+        current_point += " " + line
+# Add the last point
+if current_point:
+    outline_points.append(current_point.strip())
 
 url = "https://openrouter.ai/api/v1/chat/completions"
 headers = {
@@ -146,25 +163,24 @@ def generate_story_part(point, context, index, total):
             f"{conversational_tone_prompt}"  
             f"{natural_integration_prompt}"  
             f"{simplification_prompt}"  
-            f"You are a master YouTube script writer creating an engaging 5000-word video script.\n\n"  
-            f"{youtube_script_prompt}"  
-            f"This is the opening section of the script. Write like you're talking to a friend, not writing literature.\n"  
-            f"Keep sentences SHORT and punchy. NO flowery descriptions or dramatic language.\n"  
-            f"Tell Elena's story conversationally - like you're sharing gossip with a friend.\n\n"  
-            f"Topic/Outline Point to develop: {point}\n\n"  
+            f"You are a master YouTube script writer creating an engaging script about Elena, the janitor's daughter who takes on a corporate challenge.\n\n"  
+            f"STORY CONTEXT: This is about Elena, a janitor's daughter who gets publicly humiliated by a CEO who assigns her an 'impossible' engine repair that top engineers failed to fix. This story involves corporate corruption, hidden patents, and a father's buried legacy.\n\n"  
+            f"CRITICAL: Follow the provided outline EXACTLY. Do not create a different story about road trips or other topics.\n\n"  
+            f"Current Outline Point to develop: {point}\n\n"  
             f"OPENING SECTION REQUIREMENTS:\n"  
             f"- Write 1200-1500 words in simple, conversational language\n"  
-            f"- Start with immediate hook - no fancy scene setting\n"  
+            f"- Start with the corporate lab scene exactly as described in the outline\n"  
+            f"- Focus on Elena being humiliated by the CEO over the engine repair\n"  
+            f"- Include the boardroom setting and the impossible challenge\n"  
+            f"- End with Elena's chilling line about fixing it and the CEO regretting what he buried\n"  
             f"- Use short sentences (10-15 words max)\n"  
             f"- Sound like a regular person telling an interesting story\n"  
             f"- NO theatrical language or purple prose\n"  
-            f"- Integrate facts naturally like sharing secrets\n"  
-            f"- Use contractions and casual language throughout\n"  
             f"- Write ONLY speakable script content\n"  
             f"Please ONLY provide the story narrative in plain text.\n"  
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"  
             f"Write naturally and engagingly as if for a novel or screenplay.\n\n"  
-            f"Begin the YouTube script with conversational storytelling:"  
+            f"Begin the YouTube script following the outline exactly:"  
         )  
     elif is_last:  
         prompt = (  
@@ -173,17 +189,18 @@ def generate_story_part(point, context, index, total):
             f"{natural_integration_prompt}"  
             f"{simplification_prompt}"  
             f"You are a master YouTube script writer crafting the conclusion section.\n\n"  
-            f"{youtube_script_prompt}"  
-            f"This is the final section. Keep the same casual, friendly tone from previous sections.\n"  
-            f"Wrap up Elena's story like you're finishing a conversation with a friend.\n\n"  
-            f"Topic/Outline Point to develop: {point}\n\n"  
+            f"STORY CONTEXT: This is the final confrontation where Elena proves her father's legacy, exposes corporate corruption, and restores the truth about the stolen engine patent.\n\n"  
+            f"CRITICAL: Follow the provided outline EXACTLY. This should be about the press conference, engine demonstration, and CEO's downfall.\n\n"  
+            f"Current Outline Point to develop: {point}\n\n"  
             f"Previous Story Context:\n{context}\n\n"  
             f"CONCLUSION REQUIREMENTS:\n"  
             f"- Write 1200-1500 words in simple, conversational language\n"  
-            f"- Wrap up Elena's story naturally and casually\n"  
+            f"- Focus on the final confrontation at the press conference\n"  
+            f"- Include Elena demonstrating the working engine\n"  
+            f"- Show the CEO's resignation and truth being restored\n"  
+            f"- End with the moral message about truth and voices\n"  
             f"- Include genius call-to-action that feels natural\n"  
             f"- Keep same friendly, casual tone throughout\n"  
-            f"- NO fancy conclusions - just wrap it up like a friend would\n"  
             f"- Use short, punchy sentences\n"  
             f"- Write ONLY speakable script content\n"  
             f"Ensure consistency in characters, tone, and events.\n"  
@@ -191,7 +208,7 @@ def generate_story_part(point, context, index, total):
             f"Please ONLY provide the story narrative in plain text.\n"  
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"  
             f"Write naturally and engagingly as if for a novel or screenplay.\n\n"  
-            f"Continue and conclude the YouTube script naturally:"  
+            f"Continue and conclude the YouTube script following the outline:"  
         )  
     else:  
         prompt = (  
@@ -200,15 +217,15 @@ def generate_story_part(point, context, index, total):
             f"{natural_integration_prompt}"  
             f"{simplification_prompt}"  
             f"You are a master YouTube script writer developing the middle section.\n\n"  
-            f"{youtube_script_prompt}"  
-            f"Continue Elena's story with the same casual, friendly tone.\n"  
-            f"Keep sentences short and conversational throughout.\n\n"  
-            f"Topic/Outline Point to develop: {point}\n\n"  
+            f"STORY CONTEXT: This is Elena's story about corporate corruption, her father's stolen engine patent, and her quest to expose the truth. Stay consistent with the established corporate thriller plot.\n\n"  
+            f"CRITICAL: Follow the provided outline EXACTLY. Do not deviate from the established story about Elena, the janitor's daughter, and the corporate engine conspiracy.\n\n"  
+            f"Current Outline Point to develop: {point}\n\n"  
             f"Previous Story Context:\n{context}\n\n"  
             f"MIDDLE SECTION REQUIREMENTS:\n"  
             f"- Write 1200-1500 words in simple, conversational language\n"  
-            f"- Continue Elena's story like you're chatting with a friend\n"  
-            f"- Integrate research and facts naturally, not formally\n"  
+            f"- Continue Elena's corporate conspiracy story exactly as outlined\n"  
+            f"- Focus on the specific events mentioned in this outline point\n"  
+            f"- Maintain consistency with established characters and plot\n"  
             f"- Use casual transitions: 'So here's what happened', 'But wait'\n"  
             f"- Keep sentences short and punchy (10-15 words)\n"  
             f"- NO literary descriptions - just tell the story simply\n"  
@@ -218,7 +235,7 @@ def generate_story_part(point, context, index, total):
             f"Please ONLY provide the story narrative in plain text.\n"  
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"  
             f"Write naturally and engagingly as if for a novel or screenplay.\n\n"  
-            f"Continue the YouTube script conversationally:"  
+            f"Continue the YouTube script following the outline exactly:"  
         )  
 
     data = {  
