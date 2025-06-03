@@ -78,6 +78,18 @@ jobs:
                 "End with a cliffhanger, twist, or powerful emotional beat that invites the listener to keep watching.\n"
                 "Keep narration vivid but always clear. Don’t get poetic — get personal, raw, and real.\n"
                 "If appropriate, include a call to action (e.g., like/comment) before the next part.\n"
+                # Added concise improvements based on your detailed feedback:
+                "Begin with a gripping in-media-res moment before revealing backstory to boost retention.\n"
+                "Use dialogue that implies rather than explains — avoid expositional speeches.\n"
+                "Introduce immediate threats or obstacles beyond the protagonist’s self-doubt or time pressure.\n"
+                "Show fleeting vulnerability in the protagonist before their resolve to enhance realism.\n"
+                "Portray antagonists with subtle, chilling politeness rather than overt cruelty.\n"
+                "Imply hidden motives for key character actions to add depth and plausibility.\n"
+                "Clarify stakes by hinting at real consequences (e.g., exile, loss of reputation) without over-explaining.\n"
+                "Tighten metaphors to avoid redundancy and keep prose punchy.\n"
+                "Make dialogue rhythm snappy and impactful — short, varied sentences work best.\n"
+                "Add brief sensory or emotional flashbacks tied to the protagonist’s backstory to enrich motivation.\n"
+                "Close with a thematic callback or a twist on a recurring motif to leave a lasting impression.\n"
             )
 
             if is_first:
@@ -96,81 +108,63 @@ jobs:
             elif is_last:
                 prompt = (
                     f"You are a professional storyteller.\n"
-                    f"Use the outline point below to write the final part of the story.\n"
-                    f"This is the ending, so conclude the narrative in a satisfying and emotionally resonant way.\n"
-                    f"Tie up any loose threads and reflect on the protagonist’s journey.\n"
+                    f"Continue the story using the outline point below.\n"
+                    f"This is the final part, so bring emotional and narrative closure.\n"
                     f"Outline Point: {point}\n\n"
-                    f"Previous Story Context:\n{context}\n\n"
-                    f"Write at least 500 words for this section.\n"
-                    f"Ensure consistency in characters, tone, and events.\n"
-                    f"Do NOT introduce new subplots or major characters.\n"
+                    f"Write at least 500 words.\n"
+                    f"Ensure the narrative is compelling, cinematic, and leaves a strong impression.\n"
                     f"Please ONLY provide the story narrative in plain text.\n"
-                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-                    f"Write naturally and engagingly as if for a novel or screenplay.\n"
+                    f"Do NOT include any titles, section headers, explanations, or text outside the story.\n"
                     + cinematic_prompt
                 )
             else:
                 prompt = (
                     f"You are a professional storyteller.\n"
-                    f"Based on the outline point below, continue the story coherently using the context provided.\n"
+                    f"Continue the story from prior parts, following the outline point below.\n"
+                    f"Build upon previous context naturally, adding depth and tension.\n"
                     f"Outline Point: {point}\n\n"
-                    f"Previous Story Context:\n{context}\n\n"
-                    f"Focus: Write at least 500 words for the current outline point.\n"
-                    f"Instructions: Emphasize consistency in characters, tone, and events.\n"
+                    f"Write at least 500 words.\n"
+                    f"Keep the tone cinematic and emotionally engaging.\n"
                     f"Please ONLY provide the story narrative in plain text.\n"
-                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-                    f"Write naturally and engagingly as if for a novel or screenplay.\n"
+                    f"Do NOT include titles, section headers, or explanations.\n"
                     + cinematic_prompt
                 )
 
-            data = {
-                "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
+            messages = []
+            if context:
+                messages.append({"role": "system", "content": "You are a skilled storyteller creating cinematic, emotionally gripping stories."})
+                messages.append({"role": "user", "content": f"Previous story context:\n{context}"})
+            else:
+                messages.append({"role": "system", "content": "You are a skilled storyteller creating cinematic, emotionally gripping stories."})
+
+            messages.append({"role": "user", "content": prompt})
+
+            payload = {
+                "model": "gpt-4o-mini",
+                "messages": messages,
+                "max_tokens": 1500,
+                "temperature": 0.7,
+                "top_p": 1,
+                "frequency_penalty": 0,
+                "presence_penalty": 0
             }
 
-            response = requests.post(url, headers=headers, data=json.dumps(data))
-            if response.status_code == 200:
-                result = response.json()
-                raw_story = result['choices'][0]['message']['content']
-                return clean_story_output(raw_story)
-            else:
-                print(f"Error {response.status_code}: {response.text}")
-                return None
+            response = requests.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            result = response.json()
+            story_raw = result["choices"][0]["message"]["content"]
+            return clean_story_output(story_raw)
 
-        def main():
-            full_story = ""
-            total_points = len(outline_points)
-            for idx, point in enumerate(outline_points, start=1):
-                print(f"--- Generating story part {idx} ---")
-                story_part = generate_story_part(point, full_story, idx, total_points)
-                if story_part:
-                    print(story_part)
-                    print("\n")
-                    full_story += "\n" + story_part
-                    time.sleep(2)
-                else:
-                    print(f"Failed to generate part {idx}. Stopping.")
-                    break
+        total_points = len(outline_points)
+        story_context = ""
+        full_story = ""
 
-            with open("generated_story.txt", "w") as f:
-                f.write(full_story.strip())
+        for i, point in enumerate(outline_points, 1):
+            story_part = generate_story_part(point, story_context, i, total_points)
+            full_story += story_part + "\n\n"
+            story_context += story_part + "\n"
 
-        if __name__ == "__main__":
-            main()
+            time.sleep(2)  # brief pause between calls to avoid rate limits
+
+        print(full_story.strip())
         EOF
-
-    - name: Set up Git identity
-      run: |
-        git config --global user.name "ansentase"
-        git config --global user.email "samomsan7@gmail.com"
-
-    - name: Commit and push generated story
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        git add generated_story.txt
-        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"
-        git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
