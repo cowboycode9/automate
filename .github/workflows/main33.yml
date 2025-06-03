@@ -9,162 +9,181 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: write  # Required for pushing to repo
 
 jobs:
   generate-story:
     runs-on: ubuntu-latest
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    steps:  
+    - name: Checkout repository  
+      uses: actions/checkout@v3  
 
-    - name: Run Story Generator
-      env:
-        INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      run: |
-        python3 - <<EOF
-        import os
-        import json
-        import time
-        import requests
-        import re
+    - name: Run Story Generator  
+      env:  
+        INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}  
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}  
+      run: |  
+        python3 - <<EOF  
+        import os  
+        import json  
+        import time  
+        import requests  
+        import re  
 
-        outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")
-        outline_sections = re.split(r'\n(?=\d+\.\s)', outline_text.strip())
-        outline_points = [section.strip() for section in outline_sections if section.strip()]
+        outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")  
+        outline_sections = re.split(r'\\n(?=\\d+\\.\\s)', outline_text.strip())  
+        outline_points = [section.strip() for section in outline_sections if section.strip()]  
 
-        url = "https://openrouter.ai/api/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://your-site.com",
-            "X-Title": "Story Generator"
-        }
+        url = "https://openrouter.ai/api/v1/chat/completions"  
+        headers = {  
+            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",  
+            "Content-Type": "application/json",  
+            "HTTP-Referer": "https://your-site.com",  
+            "X-Title": "Story Generator"  
+        }  
 
-        def clean_story_output(raw_text):
-            lines = raw_text.splitlines()
-            cleaned_lines = []
-            skip_patterns = [
-                r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
-                r'.*outline.*'
-            ]
-            for line in lines:
-                if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
-                    continue
-                if "NOTE:" in line or line.strip().endswith(":"):
-                    continue
-                cleaned_lines.append(line)
-            return '\n'.join(cleaned_lines).strip()
+        def clean_story_output(raw_text):  
+            lines = raw_text.splitlines()  
+            cleaned_lines = []  
+            skip_patterns = [  
+                r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',  
+                r'.*outline.*'  
+            ]  
+            for line in lines:  
+                if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):  
+                    continue  
+                if "NOTE:" in line or line.strip().endswith(":"):  
+                    continue  
+                cleaned_lines.append(line)  
+            return '\\n'.join(cleaned_lines).strip()  
 
-        def generate_story_part(point, context, index, total):
-            is_first = index == 1
-            is_last = index == total
+        def generate_story_part(point, context, index, total):  
+            is_first = index == 1  
+            is_last = index == total  
 
-            cinematic_prompt = (
-                "\nAdditional Instructions:\n"
-                "Write a dramatic, cinematic storytelling passage focused on a key moment or scene in the story. The style should be concise but emotionally powerful, like a gripping YouTube narration script.\n"
-                "Start with an emotional hook — show what’s at stake for the protagonist immediately.\n"
-                "Use simple, punchy language suitable for spoken narration; avoid literary or overly complex phrasing.\n"
-                "Avoid vague or abstract lines — ground all descriptions in concrete detail that listeners can visualize.\n"
-                "Sharpen the pacing — trim repetitive or overly descriptive moments that slow down the momentum.\n"
-                "Highlight the protagonist’s internal motivation early and clearly. Why does this moment matter emotionally?\n"
-                "Add immersive sensory detail — what do we see, hear, feel, or smell? Brief, but vivid.\n"
-                "Show characters through actions and impactful dialogue — minimize exposition.\n"
-                "Reveal stakes, mysteries, or secrets gradually through conflict or tension.\n"
-                "Use short paragraphs and varied sentence lengths to enhance flow.\n"
-                "Include a suspenseful turn or emotional beat that deepens audience engagement.\n"
-                "End with a cliffhanger, twist, or powerful emotional beat that invites the listener to keep watching.\n"
-                "Keep narration vivid but always clear. Don’t get poetic — get personal, raw, and real.\n"
-                "If appropriate, include a call to action (e.g., like/comment) before the next part.\n"
-                # Added concise improvements based on your detailed feedback:
-                "Begin with a gripping in-media-res moment before revealing backstory to boost retention.\n"
-                "Use dialogue that implies rather than explains — avoid expositional speeches.\n"
-                "Introduce immediate threats or obstacles beyond the protagonist’s self-doubt or time pressure.\n"
-                "Show fleeting vulnerability in the protagonist before their resolve to enhance realism.\n"
-                "Portray antagonists with subtle, chilling politeness rather than overt cruelty.\n"
-                "Imply hidden motives for key character actions to add depth and plausibility.\n"
-                "Clarify stakes by hinting at real consequences (e.g., exile, loss of reputation) without over-explaining.\n"
-                "Tighten metaphors to avoid redundancy and keep prose punchy.\n"
-                "Make dialogue rhythm snappy and impactful — short, varied sentences work best.\n"
-                "Add brief sensory or emotional flashbacks tied to the protagonist’s backstory to enrich motivation.\n"
-                "Close with a thematic callback or a twist on a recurring motif to leave a lasting impression.\n"
+            youtube_script_prompt = (
+                "Write a YouTube script for the given topic that must be started with a powerful Trailer level hook to grab immediate attention. Add a top level hook in the first 30 sec that maintains viewers to watch video from start to end, and then maintain that hook in all over script till end. The script should immediately grab attention and keep viewers hooked. The intro should start by directly proving the video's title claim with a bold and exciting statement. It should make the topic feel important, exclusive, or shocking so that viewers instantly trust that they will get valuable and relevant content. Use simple yet powerful language that builds curiosity and makes them want to keep watching. If possible, include a surprising fact, statistic, or statement that supports the claim. To keep the audience engaged, introduce an element of suspense, danger, mystery, or controversy related to the topic. The goal is to make them feel like they are about to learn something they can't afford to miss. End the intro by teasing what's coming next, making sure the transition into the main content feels natural and exciting. Keep it clear, concise, and full of energy so that viewers stay invested in the video. The tone should match the topic-whether it's thrilling, dramatic, or informative-so that the intro feels like the perfect setup for what's coming next\\n\\n"
+                "Structure the script into clear sections, including an introduction, main content and a conclusion with a specific call to action. I do not want a local plz subscribe type call to action, I want a genius call to action, Use engagement techniques like open loops, delayed reveals, Curiosity, fear, and emotional variety to keep viewers interested in video.\\n\\n"
+                "Apply a storytelling approach with a beginning, middle, and end, using relatable scenarios and transformations. Maintain a conversational and natural tone, avoiding overly complex language or Al-sounding phrases. Ensure that the script aligns with the expectations set by the title or hint provided, and make the CTA at the end engaging and relevant to the topic.\\n\\n"
+                "If there are any relevant, include Well Researched (data, statistics, expert quotes, comparisons etc) Include engaging elements like Rhetorical questions, Contrasts, Humor Cliffhangers before key revelations.\\n\\n"
+                "Use easy wording, Write in paragraphs. Do not suggest scenes and clips. Add engaging sentence starters like 'this was shocking, Let me explain how, This is how' and other suitable engaging starters (these are just examples to understand the concept, apply accordingly)\\n\\n"
+                "NOTE: I want a genius script. Well researched script with a humorous tone. Also please don't include these words: like, we delve into, Unlock the secrets, Join us on a journey, deep, delve, dive, Embark, journey, Discover, explore, Picture this, unravel, embrace, Picture, Get ready, realm, unravel the secrets, In this realm, Let's dive in, Imagine (because these words sound like AI generated content)\\n\\n"
+                "If Duration is above 10 Minutes expand points with more storytelling, examples, and in-depth explanations.\\n\\n"
+                "Clearly introduce the video topic, Add emotional or relatable elements that directly hit viewers mind, to keep them engaged\\n\\n"
+                "Voice & Tone Must be Friendly, engaging, and conversational. Written as if you're speaking directly to the viewer. No robotic or overly formal tone. Use natural pauses and variation in sentence lengths for a human feel\\n\\n"
+                "The most important thing is that I want 5000 Words script, So Write 5000 words script, Don't compromise with me I will count if you write less than given number, so be sure script must be 5000 Words\\n\\n"
             )
 
-            if is_first:
-                prompt = (
-                    f"You are a professional storyteller.\n"
-                    f"Begin the story from scratch using the outline point below.\n"
-                    f"This is the very beginning, so introduce the protagonist, setting, and tone naturally.\n"
-                    f"Outline Point: {point}\n\n"
-                    f"Write at least 500 words for this section.\n"
-                    f"Make sure to set the stage clearly and begin the narrative with no assumed prior events.\n"
-                    f"Please ONLY provide the story narrative in plain text.\n"
-                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-                    f"Write naturally and engagingly as if for a novel or screenplay.\n"
-                    + cinematic_prompt
-                )
-            elif is_last:
-                prompt = (
-                    f"You are a professional storyteller.\n"
-                    f"Continue the story using the outline point below.\n"
-                    f"This is the final part, so bring emotional and narrative closure.\n"
-                    f"Outline Point: {point}\n\n"
-                    f"Write at least 500 words.\n"
-                    f"Ensure the narrative is compelling, cinematic, and leaves a strong impression.\n"
-                    f"Please ONLY provide the story narrative in plain text.\n"
-                    f"Do NOT include any titles, section headers, explanations, or text outside the story.\n"
-                    + cinematic_prompt
-                )
-            else:
-                prompt = (
-                    f"You are a professional storyteller.\n"
-                    f"Continue the story from prior parts, following the outline point below.\n"
-                    f"Build upon previous context naturally, adding depth and tension.\n"
-                    f"Outline Point: {point}\n\n"
-                    f"Write at least 500 words.\n"
-                    f"Keep the tone cinematic and emotionally engaging.\n"
-                    f"Please ONLY provide the story narrative in plain text.\n"
-                    f"Do NOT include titles, section headers, or explanations.\n"
-                    + cinematic_prompt
-                )
+            if is_first:  
+                prompt = (  
+                    f"You are a master YouTube script writer creating an engaging 5000-word video script.\\n\\n"  
+                    f"{youtube_script_prompt}"  
+                    f"This is the opening section of the script. Create a powerful trailer-level hook that grabs immediate attention in the first 30 seconds.\\n"  
+                    f"Start with a bold statement that proves the video's title claim immediately.\\n"  
+                    f"Make the topic feel important, exclusive, or shocking.\\n\\n"  
+                    f"Topic/Outline Point to develop: {point}\\n\\n"  
+                    f"Requirements:\\n"  
+                    f"- Write 1200-1500 words for this opening section\\n"  
+                    f"- Create an immediate hook with a bold, attention-grabbing statement\\n"  
+                    f"- Include surprising facts, statistics, or shocking revelations\\n"  
+                    f"- Build suspense and curiosity throughout\\n"  
+                    f"- Use conversational, natural tone - no AI-sounding phrases\\n"  
+                    f"- Include engaging sentence starters and rhetorical questions\\n"  
+                    f"- Write ONLY the script content - no titles, headers, or meta-commentary\\n"  
+                    f"- Ensure this section contributes to the total 5000-word count\\n\\n"  
+                    f"Begin the YouTube script now:"  
+                )  
+            elif is_last:  
+                prompt = (  
+                    f"You are a master YouTube script writer crafting the conclusion section.\\n\\n"  
+                    f"{youtube_script_prompt}"  
+                    f"This is the final section of the script. Bring all points to a powerful conclusion with a genius call-to-action.\\n"  
+                    f"Resolve all open loops and provide satisfying revelations.\\n"  
+                    f"Create an engaging CTA that's relevant to the topic - not just 'please subscribe'.\\n\\n"  
+                    f"Topic/Outline Point to develop: {point}\\n\\n"  
+                    f"Previous Script Context (maintain consistency):\\n{context}\\n\\n"  
+                    f"Requirements:\\n"  
+                    f"- Write 1200-1500 words for this conclusion section\\n"  
+                    f"- Resolve all mysteries and open loops established earlier\\n"  
+                    f"- Include a genius call-to-action relevant to the topic\\n"  
+                    f"- Maintain the engaging, conversational tone from previous sections\\n"  
+                    f"- Provide emotional resonance and lasting impact\\n"  
+                    f"- Use humor and engaging elements throughout\\n"  
+                    f"- Write ONLY the script content - no titles, headers, or commentary\\n"  
+                    f"- Ensure this section contributes to the total 5000-word count\\n\\n"  
+                    f"Continue and conclude the YouTube script:"  
+                )  
+            else:  
+                prompt = (  
+                    f"You are a master YouTube script writer developing the middle section.\\n\\n"  
+                    f"{youtube_script_prompt}"  
+                    f"Build upon the established script while maintaining engagement and escalating interest.\\n"  
+                    f"This section should advance the content significantly and deepen viewer engagement.\\n"  
+                    f"Use open loops, delayed reveals, and cliffhangers before key revelations.\\n\\n"  
+                    f"Topic/Outline Point to develop: {point}\\n\\n"  
+                    f"Previous Script Context (maintain consistency):\\n{context}\\n\\n"  
+                    f"Requirements:\\n"  
+                    f"- Write 1200-1500 words for this section\\n"  
+                    f"- Maintain consistency with previous script sections\\n"  
+                    f"- Include well-researched data, statistics, and expert insights\\n"  
+                    f"- Use engaging elements like rhetorical questions and contrasts\\n"  
+                    f"- Create smooth transitions and maintain viewer interest\\n"  
+                    f"- Apply storytelling with relatable scenarios and examples\\n"  
+                    f"- Use conversational tone with natural pauses and sentence variation\\n"  
+                    f"- Write ONLY the script content - no titles, headers, or commentary\\n"  
+                    f"- Ensure this section contributes to the total 5000-word count\\n\\n"  
+                    f"Continue the YouTube script:"  
+                )  
 
-            messages = []
-            if context:
-                messages.append({"role": "system", "content": "You are a skilled storyteller creating cinematic, emotionally gripping stories."})
-                messages.append({"role": "user", "content": f"Previous story context:\n{context}"})
-            else:
-                messages.append({"role": "system", "content": "You are a skilled storyteller creating cinematic, emotionally gripping stories."})
+            data = {  
+                "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",  
+                "messages": [  
+                    {"role": "user", "content": prompt}  
+                ]  
+            }  
 
-            messages.append({"role": "user", "content": prompt})
+            response = requests.post(url, headers=headers, data=json.dumps(data))  
+            if response.status_code == 200:  
+                result = response.json()  
+                raw_story = result['choices'][0]['message']['content']  
+                return clean_story_output(raw_story)  
+            else:  
+                print(f"Error {response.status_code}: {response.text}")  
+                return None  
 
-            payload = {
-                "model": "gpt-4o-mini",
-                "messages": messages,
-                "max_tokens": 1500,
-                "temperature": 0.7,
-                "top_p": 1,
-                "frequency_penalty": 0,
-                "presence_penalty": 0
-            }
+        def main():  
+            full_story = ""  
+            total_points = len(outline_points)  
+            for idx, point in enumerate(outline_points, start=1):  
+                print(f"--- Generating script part {idx} ---")  
+                story_part = generate_story_part(point, full_story, idx, total_points)  
+                if story_part:  
+                    print(story_part)  
+                    print("\\n")  
+                    full_story += "\\n" + story_part  
+                    time.sleep(2)  
+                else:  
+                    print(f"Failed to generate part {idx}. Stopping.")  
+                    break  
 
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            result = response.json()
-            story_raw = result["choices"][0]["message"]["content"]
-            return clean_story_output(story_raw)
+            with open("generated_story.txt", "w") as f:  
+                f.write(full_story.strip())  
 
-        total_points = len(outline_points)
-        story_context = ""
-        full_story = ""
+        if __name__ == "__main__":  
+            main()  
+        EOF  
 
-        for i, point in enumerate(outline_points, 1):
-            story_part = generate_story_part(point, story_context, i, total_points)
-            full_story += story_part + "\n\n"
-            story_context += story_part + "\n"
+    - name: Set up Git identity  
+      run: |  
+        git config --global user.name "ansentase"  
+        git config --global user.email "samomsan7@gmail.com"  
 
-            time.sleep(2)  # brief pause between calls to avoid rate limits
-
-        print(full_story.strip())
-        EOF
+    - name: Commit and push generated story  
+      env:  
+        GH_PAT: ${{ secrets.GH_PAT }}  
+      run: |  
+        git add generated_story.txt  
+        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")  
+        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"  
+        git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
