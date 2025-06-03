@@ -48,19 +48,64 @@ jobs:
             cleaned_lines = []  
             skip_patterns = [  
                 r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',  
-                r'.*outline.*'  
+                r'.*outline.*',
+                r'^\\s*[-•]',  # Remove bullet points
+                r'^\\s*\\d+\\.',  # Remove numbered lists
+                r'^\\s*\\*\\*.*\\*\\*',  # Remove bold headers
+                r'.*word count.*',  # Remove word count references
+                r'.*section.*requirements.*',  # Remove section requirements
+                r'^\\s*\\[.*\\]',  # Remove bracketed content
+                r'^\\s*\\|.*\\|',  # Remove table formatting
+                r'.*acknowledge.*receipt.*',  # Remove meta instructions
+                r'.*table.*allocation.*',  # Remove table references
+                r'^\\s*A\\).*B\\).*C\\).*',  # Remove multiple choice options
             ]  
+            
+            in_stage_direction = False
             for line in lines:  
+                # Skip lines that match skip patterns
                 if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):  
                     continue  
-                if "NOTE:" in line or line.strip().endswith(":"):  
-                    continue  
-                cleaned_lines.append(line)  
+                    
+                # Remove stage directions in parentheses
+                line = re.sub(r'\\([^)]*\\)', '', line)
+                
+                # Remove formatting markers
+                line = re.sub(r'\\*\\*([^*]+)\\*\\*', r'\\1', line)  # Remove bold
+                line = re.sub(r'\\*([^*]+)\\*', r'\\1', line)  # Remove italics
+                line = re.sub(r'#{1,6}\\s*', '', line)  # Remove headers
+                
+                # Skip lines that are just punctuation or very short
+                if len(line.strip()) < 3:
+                    continue
+                    
+                # Skip lines with meta-commentary
+                if any(word in line.lower() for word in ['note:', 'requirements:', 'section', 'word count', 'please provide', 'acknowledge']):
+                    continue
+                    
+                cleaned_lines.append(line.strip())  
+                
             return '\\n'.join(cleaned_lines).strip()  
 
         def generate_story_part(point, context, index, total):  
             is_first = index == 1  
             is_last = index == total  
+
+            # Enhanced prompt with voiceover-ready specifications
+            voiceover_ready_prompt = (
+                "CRITICAL: This script must be 100% VOICEOVER-READY. Write ONLY speakable content that flows naturally when read aloud.\\n\\n"
+                "VOICEOVER REQUIREMENTS:\\n"
+                "- Write in PURE CONVERSATIONAL PROSE only - no bullet points, headers, or formatting\\n"
+                "- NO stage directions, parenthetical notes, or character labels\\n"
+                "- NO meta-commentary about the script itself\\n"
+                "- NO incomplete sections or 'to be continued' references\\n"
+                "- Every sentence must be complete and speakable\\n"
+                "- Use natural speech rhythm with varied sentence lengths\\n"
+                "- Write as if speaking directly to one person in a friendly conversation\\n"
+                "- NO artificial dialogue between characters - tell the story as a narrator\\n"
+                "- NO formatting symbols (* ** - • # [ ] | etc.)\\n"
+                "- NO section breaks or headers within the content\\n\\n"
+            )
 
             youtube_script_prompt = (
                 "Write a YouTube script for the given topic that must be started with a powerful Trailer level hook to grab immediate attention. Add a top level hook in the first 30 sec that maintains viewers to watch video from start to end, and then maintain that hook in all over script till end. The script should immediately grab attention and keep viewers hooked. The intro should start by directly proving the video's title claim with a bold and exciting statement. It should make the topic feel important, exclusive, or shocking so that viewers instantly trust that they will get valuable and relevant content. Use simple yet powerful language that builds curiosity and makes them want to keep watching. If possible, include a surprising fact, statistic, or statement that supports the claim. To keep the audience engaged, introduce an element of suspense, danger, mystery, or controversy related to the topic. The goal is to make them feel like they are about to learn something they can't afford to miss. End the intro by teasing what's coming next, making sure the transition into the main content feels natural and exciting. Keep it clear, concise, and full of energy so that viewers stay invested in the video. The tone should match the topic-whether it's thrilling, dramatic, or informative-so that the intro feels like the perfect setup for what's coming next\\n\\n"
@@ -89,67 +134,88 @@ jobs:
                 "- Balance exposition with action - don't info-dump through dialogue\\n\\n"
             )
 
+            narrative_flow_prompt = (
+                "NARRATIVE STRUCTURE REQUIREMENTS:\\n"
+                "- Tell the story as a YouTube narrator speaking directly to the audience\\n"
+                "- NO character dialogue scenes - describe what happened instead\\n"
+                "- Use 'Elena did this' or 'Elena said that' rather than writing dialogue\\n"
+                "- Maintain single narrator voice throughout\\n"
+                "- Create smooth transitions between all topics\\n"
+                "- Each paragraph should flow naturally to the next\\n"
+                "- Complete all thoughts and stories - no cliff-hangers mid-section\\n"
+                "- Write in present tense for immediacy\\n\\n"
+            )
+
+            completion_prompt = (
+                "COMPLETION REQUIREMENTS:\\n"
+                "- Every section must be 100% complete with no placeholders\\n"
+                "- NO references to 'coming up next' or 'stay tuned' within sections\\n"
+                "- NO bullet points or lists - convert everything to flowing sentences\\n"
+                "- NO technical formatting or markup\\n"
+                "- Write complete stories and explanations, not outlines\\n"
+                "- End each section with smooth transition to maintain flow\\n\\n"
+            )
+
             if is_first:  
                 prompt = (  
+                    f"{voiceover_ready_prompt}"
+                    f"{narrative_flow_prompt}"
+                    f"{completion_prompt}"
                     f"You are a master YouTube script writer creating an engaging 5000-word video script.\\n\\n"  
                     f"{youtube_script_prompt}"  
-                    f"This is the opening section of the script. START WITH ACTION OR CONFLICT IMMEDIATELY - no lengthy atmospheric descriptions.\\n"  
-                    f"Jump straight into the story with characters doing something compelling.\\n"  
-                    f"Make characters speak naturally with realistic, flawed reactions.\\n\\n"  
+                    f"This is the opening section of the script. Write as a YouTube narrator telling the story directly to viewers.\\n"  
+                    f"NO character dialogue - describe what Elena and others did and said.\\n"
+                    f"Start with immediate impact and maintain engagement throughout.\\n\\n"  
                     f"Topic/Outline Point to develop: {point}\\n\\n"  
                     f"OPENING SECTION REQUIREMENTS:\\n"  
-                    f"- Write 1200-1500 words for this opening section\\n"  
-                    f"- START with immediate action/conflict, not scene-setting\\n"  
-                    f"- Characters must speak like real people with natural dialogue\\n"  
-                    f"- Show character flaws and authentic vulnerabilities\\n"  
-                    f"- Make stakes crystal clear early - what's at risk?\\n"  
-                    f"- Use varied sentence lengths for natural rhythm\\n"  
-                    f"- Build tension gradually, avoid forced drama\\n"  
-                    f"- Give each character distinct speech patterns\\n"  
-                    f"- Balance action with minimal, impactful exposition\\n"  
-                    f"- Write ONLY the script content - no formatting artifacts\\n"  
-                    f"- Ensure this section contributes to the total 5000-word count\\n\\n"  
-                    f"Begin the YouTube script with immediate action:"  
+                    f"- Write 1200-1500 words of pure conversational narrative\\n"  
+                    f"- Start with powerful hook that grabs attention immediately\\n"  
+                    f"- Tell Elena's story as narrator, not through character scenes\\n"  
+                    f"- Use natural speaking rhythm with varied sentence lengths\\n"  
+                    f"- Build curiosity and maintain viewer interest throughout\\n"  
+                    f"- Complete this section fully - no placeholders or outlines\\n"  
+                    f"- Write ONLY speakable script content\\n\\n"  
+                    f"Begin the YouTube script with immediate narrative impact:"  
                 )  
             elif is_last:  
                 prompt = (  
+                    f"{voiceover_ready_prompt}"
+                    f"{narrative_flow_prompt}"
+                    f"{completion_prompt}"
                     f"You are a master YouTube script writer crafting the conclusion section.\\n\\n"  
                     f"{youtube_script_prompt}"  
-                    f"This is the final section of the script. Bring all points to a powerful conclusion with a genius call-to-action.\\n"  
-                    f"Resolve all open loops and provide satisfying revelations.\\n"  
-                    f"Create an engaging CTA that's relevant to the topic - not just 'please subscribe'.\\n\\n"  
+                    f"This is the final section. Bring everything to a powerful conclusion with genius call-to-action.\\n"  
+                    f"Continue the narrator voice established in previous sections.\\n\\n"  
                     f"Topic/Outline Point to develop: {point}\\n\\n"  
-                    f"Previous Script Context (maintain consistency):\\n{context}\\n\\n"  
-                    f"Requirements:\\n"  
-                    f"- Write 1200-1500 words for this conclusion section\\n"  
-                    f"- Resolve all mysteries and open loops established earlier\\n"  
-                    f"- Include a genius call-to-action relevant to the topic\\n"  
-                    f"- Maintain the engaging, conversational tone from previous sections\\n"  
-                    f"- Provide emotional resonance and lasting impact\\n"  
-                    f"- Use humor and engaging elements throughout\\n"  
-                    f"- Write ONLY the script content - no titles, headers, or commentary\\n"  
-                    f"- Ensure this section contributes to the total 5000-word count\\n\\n"  
+                    f"Previous Script Context (maintain consistency):\\n{context[-1000:]}\\n\\n"  
+                    f"CONCLUSION REQUIREMENTS:\\n"  
+                    f"- Write 1200-1500 words of conversational narrative\\n"  
+                    f"- Resolve all mysteries and complete Elena's story\\n"  
+                    f"- Include genius call-to-action relevant to the topic\\n"  
+                    f"- Maintain same narrator voice from previous sections\\n"  
+                    f"- Provide satisfying conclusion and emotional impact\\n"  
+                    f"- Write ONLY speakable script content\\n\\n"  
                     f"Continue and conclude the YouTube script:"  
                 )  
             else:  
                 prompt = (  
+                    f"{voiceover_ready_prompt}"
+                    f"{narrative_flow_prompt}"
+                    f"{completion_prompt}"
                     f"You are a master YouTube script writer developing the middle section.\\n\\n"  
                     f"{youtube_script_prompt}"  
-                    f"Build upon the established script while maintaining engagement and escalating interest.\\n"  
-                    f"This section should advance the content significantly and deepen viewer engagement.\\n"  
-                    f"Use open loops, delayed reveals, and cliffhangers before key revelations.\\n\\n"  
+                    f"Continue the established narrator voice while advancing Elena's story.\\n"  
+                    f"Maintain engagement and build toward the conclusion.\\n\\n"  
                     f"Topic/Outline Point to develop: {point}\\n\\n"  
-                    f"Previous Script Context (maintain consistency):\\n{context}\\n\\n"  
-                    f"Requirements:\\n"  
-                    f"- Write 1200-1500 words for this section\\n"  
-                    f"- Maintain consistency with previous script sections\\n"  
-                    f"- Include well-researched data, statistics, and expert insights\\n"  
-                    f"- Use engaging elements like rhetorical questions and contrasts\\n"  
-                    f"- Create smooth transitions and maintain viewer interest\\n"  
-                    f"- Apply storytelling with relatable scenarios and examples\\n"  
-                    f"- Use conversational tone with natural pauses and sentence variation\\n"  
-                    f"- Write ONLY the script content - no titles, headers, or commentary\\n"  
-                    f"- Ensure this section contributes to the total 5000-word count\\n\\n"  
+                    f"Previous Script Context (maintain consistency):\\n{context[-1000:]}\\n\\n"  
+                    f"MIDDLE SECTION REQUIREMENTS:\\n"  
+                    f"- Write 1200-1500 words of conversational narrative\\n"  
+                    f"- Continue same narrator voice from previous sections\\n"  
+                    f"- Advance Elena's story with engaging details\\n"  
+                    f"- Include research, statistics, and expert insights naturally\\n"  
+                    f"- Use rhetorical questions and engaging elements\\n"  
+                    f"- Create smooth transitions and maintain interest\\n"  
+                    f"- Write ONLY speakable script content\\n\\n"  
                     f"Continue the YouTube script:"  
                 )  
 
@@ -164,7 +230,14 @@ jobs:
             if response.status_code == 200:  
                 result = response.json()  
                 raw_story = result['choices'][0]['message']['content']  
-                return clean_story_output(raw_story)  
+                cleaned_story = clean_story_output(raw_story)
+                
+                # Additional cleaning for voiceover readiness
+                cleaned_story = re.sub(r'\\n\\s*\\n\\s*\\n+', '\\n\\n', cleaned_story)  # Remove excessive line breaks
+                cleaned_story = re.sub(r'^\\s*---.*$', '', cleaned_story, flags=re.MULTILINE)  # Remove section dividers
+                cleaned_story = re.sub(r'\\bPart \\d+\\b', '', cleaned_story)  # Remove part references
+                
+                return cleaned_story
             else:  
                 print(f"Error {response.status_code}: {response.text}")  
                 return None  
@@ -178,14 +251,20 @@ jobs:
                 if story_part:  
                     print(story_part)  
                     print("\\n")  
-                    full_story += "\\n" + story_part  
+                    full_story += "\\n\\n" + story_part  
                     time.sleep(2)  
                 else:  
                     print(f"Failed to generate part {idx}. Stopping.")  
                     break  
 
+            # Final cleaning pass for the complete story
+            full_story = full_story.strip()
+            full_story = re.sub(r'\\n{3,}', '\\n\\n', full_story)  # Normalize spacing
+            full_story = re.sub(r'^\\s*[-•*].*$', '', full_story, flags=re.MULTILINE)  # Remove any remaining bullets
+            full_story = re.sub(r'\\([^)]*\\)', '', full_story)  # Remove any remaining parentheticals
+            
             with open("generated_story.txt", "w") as f:  
-                f.write(full_story.strip())  
+                f.write(full_story)  
 
         if __name__ == "__main__":  
             main()  
