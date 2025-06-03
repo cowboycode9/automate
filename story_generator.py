@@ -19,7 +19,7 @@ def clean_story_output(raw_text):
     lines = raw_text.splitlines()
     cleaned_lines = []
     skip_patterns = [
-        r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+        r'^\s*(\*+|---+|###|Point \d+\.|End of\.|Preparation for\.|Continuity Notes\.|Please Provide\.|Generating story\.|Context\.|Tone:\.|Events:\.|Character Development:\.|NOTE:\.|)',
         r'.*outline.*',
         r'^\s*[-•]',  # Remove bullet points
         r'^\s*\d+\.',  # Remove numbered lists
@@ -30,16 +30,16 @@ def clean_story_output(raw_text):
         r'^\s*\|.*\|',  # Remove table formatting
         r'.*acknowledge.*receipt.*',  # Remove meta instructions
         r'.*table.*allocation.*',  # Remove table references
-        r'^\s*A\).*B\).*C\).*',  # Remove multiple choice options
-        r'^\s*D\).*SPECIFY.*',  # Remove remaining meta options
+        r'^\s*A\.B\.C\.',  # Remove multiple choice options
+        r'^\s*D\.SPECIFY\.',  # Remove remaining meta options
         r'.*generating script part.*',  # Remove generation references
     ]
-    
+
     for line in lines:
         # Skip lines that match skip patterns
         if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
             continue
-            
+        
         # Remove stage directions in parentheses
         line = re.sub(r'\([^)]*\)', '', line)
         
@@ -62,20 +62,20 @@ def clean_story_output(raw_text):
         # Skip lines that are just punctuation or very short
         if len(line.strip()) < 3:
             continue
-            
+        
         # Skip lines with meta-commentary
         if any(word in line.lower() for word in ['note:', 'requirements:', 'section', 'word count', 'please provide', 'acknowledge', 'specify a different']):
             continue
-            
+        
         # Skip overly dramatic phrases
         if any(phrase in line.lower() for phrase in ['storm brewing', 'knife twist', 'silent storm', 'burning eyes']):
             continue
-            
-        cleaned_lines.append(line.strip())
         
+        cleaned_lines.append(line.strip())
+    
     return '\n'.join(cleaned_lines).strip()
 
-def generate_story_part(point, context, index, total):
+def generate_story_part(point, context, index, total, all_outline_points):
     is_first = index == 1
     is_last = index == total
 
@@ -185,6 +185,12 @@ def generate_story_part(point, context, index, total):
         "- End each section with smooth transition to maintain flow\n\n"
     )
 
+    # Create outline context for better story coherence
+    outline_context = f"FULL STORY OUTLINE (use this to maintain coherence):\n"
+    for i, outline_point in enumerate(all_outline_points, 1):
+        outline_context += f"{i}. {outline_point}\n"
+    outline_context += "\n"
+
     if is_first:
         prompt = (
             f"{voiceover_ready_prompt}"
@@ -193,10 +199,11 @@ def generate_story_part(point, context, index, total):
             f"{simplification_prompt}"
             f"You are a master YouTube script writer creating an engaging 5000-word video script.\n\n"
             f"{youtube_script_prompt}"
+            f"{outline_context}"
             f"This is the opening section of the script. Write like you're talking to a friend, not writing literature.\n"
             f"Keep sentences SHORT and punchy. NO flowery descriptions or dramatic language.\n"
-            f"Tell Elena's story conversationally - like you're sharing gossip with a friend.\n\n"
-            f"Topic/Outline Point to develop: {point}\n\n"
+            f"Follow the story outline provided to create a cohesive narrative.\n\n"
+            f"Current Topic/Outline Point to develop: {point}\n\n"
             f"OPENING SECTION REQUIREMENTS:\n"
             f"- Write 1200-1500 words in simple, conversational language\n"
             f"- Start with immediate hook - no fancy scene setting\n"
@@ -206,10 +213,11 @@ def generate_story_part(point, context, index, total):
             f"- Integrate facts naturally like sharing secrets\n"
             f"- Use contractions and casual language throughout\n"
             f"- Write ONLY speakable script content\n"
+            f"- FOLLOW THE PROVIDED OUTLINE to maintain story coherence\n"
             f"Please ONLY provide the story narrative in plain text.\n"
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n\n"
-            f"Begin the YouTube script with conversational storytelling:"
+            f"Write naturally and engagingly as if for a YouTube video script.\n\n"
+            f"Begin the YouTube script with conversational storytelling based on the outline:"
         )
     elif is_last:
         prompt = (
@@ -219,24 +227,26 @@ def generate_story_part(point, context, index, total):
             f"{simplification_prompt}"
             f"You are a master YouTube script writer crafting the conclusion section.\n\n"
             f"{youtube_script_prompt}"
+            f"{outline_context}"
             f"This is the final section. Keep the same casual, friendly tone from previous sections.\n"
-            f"Wrap up Elena's story like you're finishing a conversation with a friend.\n\n"
-            f"Topic/Outline Point to develop: {point}\n\n"
+            f"Wrap up the story following the outline provided.\n\n"
+            f"Current Topic/Outline Point to develop: {point}\n\n"
             f"Previous Story Context:\n{context}\n\n"
             f"CONCLUSION REQUIREMENTS:\n"
             f"- Write 1200-1500 words in simple, conversational language\n"
-            f"- Wrap up Elena's story naturally and casually\n"
+            f"- Wrap up the story naturally and casually following the outline\n"
             f"- Include genius call-to-action that feels natural\n"
             f"- Keep same friendly, casual tone throughout\n"
             f"- NO fancy conclusions - just wrap it up like a friend would\n"
             f"- Use short, punchy sentences\n"
             f"- Write ONLY speakable script content\n"
+            f"- MAINTAIN CONSISTENCY with the story outline and previous context\n"
             f"Ensure consistency in characters, tone, and events.\n"
             f"Do NOT introduce new subplots or major characters.\n"
             f"Please ONLY provide the story narrative in plain text.\n"
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n\n"
-            f"Continue and conclude the YouTube script naturally:"
+            f"Write naturally and engagingly following the provided outline.\n\n"
+            f"Continue and conclude the YouTube script naturally based on the outline:"
         )
     else:
         prompt = (
@@ -246,24 +256,27 @@ def generate_story_part(point, context, index, total):
             f"{simplification_prompt}"
             f"You are a master YouTube script writer developing the middle section.\n\n"
             f"{youtube_script_prompt}"
-            f"Continue Elena's story with the same casual, friendly tone.\n"
-            f"Keep sentences short and conversational throughout.\n\n"
-            f"Topic/Outline Point to develop: {point}\n\n"
+            f"{outline_context}"
+            f"Continue the story with the same casual, friendly tone.\n"
+            f"Keep sentences short and conversational throughout.\n"
+            f"Follow the story outline to maintain coherence.\n\n"
+            f"Current Topic/Outline Point to develop: {point}\n\n"
             f"Previous Story Context:\n{context}\n\n"
             f"MIDDLE SECTION REQUIREMENTS:\n"
             f"- Write 1200-1500 words in simple, conversational language\n"
-            f"- Continue Elena's story like you're chatting with a friend\n"
+            f"- Continue the story like you're chatting with a friend\n"
             f"- Integrate research and facts naturally, not formally\n"
             f"- Use casual transitions: 'So here's what happened', 'But wait'\n"
             f"- Keep sentences short and punchy (10-15 words)\n"
             f"- NO literary descriptions - just tell the story simply\n"
             f"- Write ONLY speakable script content\n"
+            f"- FOLLOW THE OUTLINE to maintain story flow and coherence\n"
             f"Focus: Write at least 500 words for the current outline point.\n"
             f"Instructions: Emphasize consistency in characters, tone, and events.\n"
             f"Please ONLY provide the story narrative in plain text.\n"
             f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
-            f"Write naturally and engagingly as if for a novel or screenplay.\n\n"
-            f"Continue the YouTube script conversationally:"
+            f"Write naturally and engagingly following the provided outline.\n\n"
+            f"Continue the YouTube script conversationally based on the outline:"
         )
 
     data = {
@@ -273,32 +286,41 @@ def generate_story_part(point, context, index, total):
         ]
     }
 
-    response = requests.post(url, headers=headers, data=json.dumps(data))
-    if response.status_code == 200:
-        result = response.json()
-        raw_story = result['choices'][0]['message']['content']
-        return clean_story_output(raw_story)
-    else:
-        print(f"Error {response.status_code}: {response.text}")
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(data))
+        if response.status_code == 200:
+            result = response.json()
+            raw_story = result['choices'][0]['message']['content']
+            return clean_story_output(raw_story)
+        else:
+            print(f"Error {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        print(f"Request failed: {str(e)}")
         return None
 
 def main():
+    if not outline_points:
+        print("No outline points found. Please set INPUT_OUTLINE_TEXT environment variable.")
+        return
+    
+    print(f"Found {len(outline_points)} outline points:")
+    for i, point in enumerate(outline_points, 1):
+        print(f"{i}. {point}")
+    print("\n" + "="*50 + "\n")
+    
     full_story = ""
     total_points = len(outline_points)
+    
     for idx, point in enumerate(outline_points, start=1):
-        print(f"--- Generating story part {idx} ---")
-        story_part = generate_story_part(point, full_story, idx, total_points)
+        print(f"--- Generating story part {idx}/{total_points}: {point[:50]}... ---")
+        story_part = generate_story_part(point, full_story, idx, total_points, outline_points)
+        
         if story_part:
-            print(story_part)
+            print(f"Generated {len(story_part.split())} words")
+            print(story_part[:200] + "..." if len(story_part) > 200 else story_part)
             print("\n")
-            full_story += "\n" + story_part
-            time.sleep(2)
-        else:
-            print(f"Failed to generate part {idx}. Stopping.")
-            break
-
-    with open("generated_story.txt", "w") as f:
-        f.write(full_story.strip())
-
-if __name__ == "__main__":
-    main()
+            
+            # Build context for next section
+            if full_story:
+                full_story += "\n\n" + story_pa
