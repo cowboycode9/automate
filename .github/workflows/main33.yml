@@ -32,7 +32,8 @@ jobs:
         import re
 
         outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")
-        outline_points = [line.strip() for line in outline_text.strip().split("\n") if line.strip()]
+        outline_sections = re.split(r'\\n(?=\\d+\\.\\s)', outline_text.strip())
+        outline_points = [section.strip() for section in outline_sections if section.strip()]
 
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
@@ -46,7 +47,7 @@ jobs:
             lines = raw_text.splitlines()
             cleaned_lines = []
             skip_patterns = [
-                r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+                r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
                 r'.*outline.*'
             ]
             for line in lines:
@@ -55,37 +56,131 @@ jobs:
                 if "NOTE:" in line or line.strip().endswith(":"):
                     continue
                 cleaned_lines.append(line)
-            return '\n'.join(cleaned_lines).strip()
+            return '\\n'.join(cleaned_lines).strip()
 
-        def generate_story_part(point, context, index, total):
+        def get_ending_paragraphs(full_story, num_paragraphs=3):
+            """Extract the last 2-3 paragraphs from the story"""
+            if not full_story.strip():
+                return ""
+            
+            # Split by double newlines (paragraph breaks) or single newlines if no double breaks
+            paragraphs = re.split(r'\\n\\s*\\n', full_story.strip())
+            if len(paragraphs) == 1:
+                paragraphs = full_story.strip().split('\\n')
+            
+            # Filter out empty paragraphs
+            paragraphs = [p.strip() for p in paragraphs if p.strip()]
+            
+            # Get the last few paragraphs
+            ending_paragraphs = paragraphs[-num_paragraphs:] if len(paragraphs) >= num_paragraphs else paragraphs
+            
+            return '\\n\\n'.join(ending_paragraphs)
+
+        def generate_story_summary(full_story, current_point_index):
+            """Generate a concise summary of the story so far"""
+            if not full_story.strip():
+                return ""
+            
+            # Create summary prompt
+            summary_prompt = (
+                f"Please provide a brief 2-3 sentence summary of the key events and character developments in this story excerpt. "
+                f"Focus on what's most important for continuing the narrative:\\n\\n{full_story[-1500:]}"
+            )
+            
+            data = {
+                "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+                "messages": [
+                    {"role": "user", "content": summary_prompt}
+                ]
+            }
+            
+            try:
+                response = requests.post(url, headers=headers, data=json.dumps(data))
+                if response.status_code == 200:
+                    result = response.json()
+                    summary = result['choices'][0]['message']['content'].strip()
+                    # Clean up the summary
+                    summary = re.sub(r'^(Summary:|Here\'s a summary:)', '', summary, flags=re.IGNORECASE).strip()
+                    return summary
+                else:
+                    return f"Story continues from part {current_point_index-1}"
+            except:
+                return f"Story continues from part {current_point_index-1}"
+
+        def extract_story_elements(full_story):
+            """Extract key story elements to maintain consistency"""
+            if not full_story.strip():
+                return ""
+            
+            # Create a summary of key elements
+            summary_parts = []
+            
+            # Try to identify main character names (capitalized words that appear multiple times)
+            words = re.findall(r'\\b[A-Z][a-z]+\\b', full_story)
+            char_counts = {}
+            for word in words:
+                if len(word) > 2 and not word.lower() in ['the', 'and', 'but', 'she', 'her', 'his', 'him']:
+                    char_counts[word] = char_counts.get(word, 0) + 1
+            
+            main_chars = [char for char, count in char_counts.items() if count >= 2][:3]
+            if main_chars:
+                summary_parts.append(f"Main characters: {', '.join(main_chars)}")
+            
+            return "; ".join(summary_parts) if summary_parts else ""
+
+        def generate_story_part(point, full_story, index, total):
             is_first = index == 1
             is_last = index == total
+            
+            # Get summary and ending paragraphs for continuity
+            story_summary = generate_story_summary(full_story, index) if not is_first else ""
+            ending_paragraphs = get_ending_paragraphs(full_story) if not is_first else ""
+            story_elements = extract_story_elements(full_story)
 
             if is_first:
                 prompt = (
-                    f"You are a professional storyteller.\n"
-                    f"Begin the story from scratch using the first outline point.\n"
-                    f"Introduce characters, setting, and tone clearly.\n\n"
-                    f"Outline Point: {point}\n\n"
-                    f"Write at least 500 words. ONLY give the story in plain text."
+                    f"You are a professional storyteller.\\n"
+                    f"Begin the story from scratch using the outline point below.\\n"
+                    f"This is the very beginning, so introduce the protagonist, setting, and tone naturally.\\n"
+                    f"Outline Point: {point}\\n\\n"
+                    f"Write at least 500 words for this section.\\n"
+                    f"Make sure to set the stage clearly and begin the narrative with no assumed prior events.\\n"
+                    f"End this section with a natural transition that will flow into the next part of the story.\\n"
+                    f"Please ONLY provide the story narrative in plain text.\\n"
+                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+                    f"Write naturally and engagingly as if for a novel or screenplay.\\n"
                 )
             elif is_last:
                 prompt = (
-                    f"You are a professional storyteller continuing a story.\n"
-                    f"This is the final part based on the last outline point.\n"
-                    f"Bring the story to a satisfying conclusion.\n\n"
-                    f"Previous Story (for context):\n{context[-1500:]}\n\n"
-                    f"Next Outline Point: {point}\n\n"
-                    f"Write at least 500 words. ONLY give the story in plain text."
+                    f"You are a professional storyteller.\\n"
+                    f"Use the outline point below to write the final part of the story.\\n"
+                    f"This is the ending, so conclude the narrative in a satisfying and emotionally resonant way.\\n"
+                    f"Outline Point: {point}\\n\\n"
+                    f"Story Summary So Far: {story_summary}\\n\\n"
+                    f"Previous Section Ending:\\n{ending_paragraphs}\\n\\n"
+                    f"Story Elements to Maintain: {story_elements}\\n\\n"
+                    f"CRITICAL CONTINUITY RULE: Your section must begin exactly where the previous section ended. Read the ending paragraphs above and continue the story seamlessly from that exact moment and situation.\\n"
+                    f"Write at least 500 words for this section.\\n"
+                    f"Ensure consistency in characters, tone, and events.\\n"
+                    f"Do NOT introduce new subplots or major characters.\\n"
+                    f"Please ONLY provide the story narrative in plain text.\\n"
+                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+                    f"Write naturally and engagingly as if for a novel or screenplay.\\n"
                 )
             else:
                 prompt = (
-                    f"You are a professional storyteller.\n"
-                    f"Continue the following story logically and emotionally using the next outline point.\n\n"
-                    f"Previous Story (for continuity):\n{context[-1500:]}\n\n"
-                    f"Next Outline Point: {point}\n\n"
-                    f"Ensure characters, tone, and plot flow naturally.\n"
-                    f"Write at least 500 words. ONLY give the story in plain text."
+                    f"You are a professional storyteller.\\n"
+                    f"Based on the outline point below, continue the story coherently from where the previous section ended.\\n"
+                    f"Outline Point: {point}\\n\\n"
+                    f"Story Summary So Far: {story_summary}\\n\\n"
+                    f"Previous Section Ending:\\n{ending_paragraphs}\\n\\n"
+                    f"Story Elements to Maintain: {story_elements}\\n\\n"
+                    f"CRITICAL CONTINUITY RULE: Your section must begin exactly where the previous section ended. Read the ending paragraphs above and continue the story seamlessly from that exact moment and situation.\\n"
+                    f"Write at least 500 words for this section and end with a natural transition for the next part.\\n"
+                    f"Maintain consistency in characters, tone, and narrative flow.\\n"
+                    f"Please ONLY provide the story narrative in plain text.\\n"
+                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\\n"
+                    f"Write naturally and engagingly as if for a novel or screenplay.\\n"
                 )
 
             data = {
@@ -107,14 +202,19 @@ jobs:
         def main():
             full_story = ""
             total_points = len(outline_points)
-
             for idx, point in enumerate(outline_points, start=1):
-                print(f"\n--- Generating story part {idx} ---")
+                print(f"--- Generating story part {idx} ---")
                 story_part = generate_story_part(point, full_story, idx, total_points)
                 if story_part:
-                    print(story_part + "\n")
-                    full_story += "\n" + story_part
-                    time.sleep(2)
+                    print(story_part)
+                    print("\\n")
+                    # Add smooth connection between parts
+                    if full_story.strip():
+                        full_story += "\\n\\n" + story_part
+                    else:
+                        full_story = story_part
+                    # Add delay between API calls and extra delay after summary generation
+                    time.sleep(3 if idx > 1 else 2)
                 else:
                     print(f"Failed to generate part {idx}. Stopping.")
                     break
