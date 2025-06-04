@@ -15,166 +15,127 @@ jobs:
   generate-story:
     runs-on: ubuntu-latest
 
-    steps:  
-    - name: Checkout repository  
-      uses: actions/checkout@v3  
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-    - name: Run Story Generator  
-      env:  
-        INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}  
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}  
-      run: |  
-        python3 - <<EOF  
-        import os  
-        import json  
-        import time  
-        import requests  
-        import re  
+    - name: Run Story Generator
+      env:
+        INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      run: |
+        python3 - <<EOF
+        import os
+        import json
+        import time
+        import requests
+        import re
 
-        outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")  
-        outline_points = [line.strip() for line in outline_text.strip().split("\n") if line.strip()]  
+        outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")
+        outline_points = [line.strip() for line in outline_text.strip().split("\n") if line.strip()]
 
-        url = "https://openrouter.ai/api/v1/chat/completions"  
-        headers = {  
-            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",  
-            "Content-Type": "application/json",  
-            "HTTP-Referer": "https://your-site.com",  
-            "X-Title": "Story Generator"  
-        }  
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://your-site.com",
+            "X-Title": "Story Generator"
+        }
 
-        def clean_story_output(raw_text):  
-            lines = raw_text.splitlines()  
-            cleaned_lines = []  
-            skip_patterns = [  
-                r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',  
-                r'.*outline.*'  
-            ]  
-            for line in lines:  
-                if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):  
-                    continue  
-                if "NOTE:" in line or line.strip().endswith(":"):  
-                    continue  
-                cleaned_lines.append(line)  
-            return '\n'.join(cleaned_lines).strip()  
+        def clean_story_output(raw_text):
+            lines = raw_text.splitlines()
+            cleaned_lines = []
+            skip_patterns = [
+                r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+                r'.*outline.*'
+            ]
+            for line in lines:
+                if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):
+                    continue
+                if "NOTE:" in line or line.strip().endswith(":"):
+                    continue
+                cleaned_lines.append(line)
+            return '\n'.join(cleaned_lines).strip()
 
-        def get_last_sentences(text, num_sentences=2):
-            """Extract the last few sentences for continuity"""
-            if not text.strip():
-                return ""
-            sentences = [s.strip() for s in text.split('.') if s.strip()]
-            if len(sentences) <= num_sentences:
-                return '. '.join(sentences) + '.' if sentences else ""
-            return '. '.join(sentences[-num_sentences:]) + '.'
+        def generate_story_part(point, context, index, total):
+            is_first = index == 1
+            is_last = index == total
 
-        def get_focused_context(full_story, word_limit=1000):
-            """Get recent context within word limit"""
-            if not full_story.strip():
-                return full_story
-            words = full_story.split()
-            if len(words) <= word_limit:
-                return full_story
-            return ' '.join(words[-word_limit:])
-
-        def generate_story_part(point, context, index, total):  
-            is_first = index == 1  
-            is_last = index == total  
-
-            if is_first:  
-                prompt = (  
-                    f"You are a professional storyteller.\n"  
-                    f"Begin the story from scratch using the outline point below.\n"  
-                    f"This is the very beginning, so introduce the protagonist, setting, and tone naturally.\n"  
-                    f"Outline Point: {point}\n\n"  
-                    f"Write at least 500 words for this section.\n"  
-                    f"Make sure to set the stage clearly and begin the narrative with no assumed prior events.\n"  
-                    f"Please ONLY provide the story narrative in plain text.\n"  
-                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"  
-                    f"Write naturally and engagingly as if for a novel or screenplay.\n"  
-                )  
+            if is_first:
+                prompt = (
+                    f"You are a professional storyteller.\n"
+                    f"Begin the story from scratch using the first outline point.\n"
+                    f"Introduce characters, setting, and tone clearly.\n\n"
+                    f"Outline Point: {point}\n\n"
+                    f"Write at least 500 words. ONLY give the story in plain text."
+                )
             elif is_last:
-                last_sentences = get_last_sentences(context, 2)
-                focused_context = get_focused_context(context, 1000)
-                prompt = (  
-                    f"You are a professional storyteller.\n"  
-                    f"The previous part ended with: \"{last_sentences}\"\n\n"
-                    f"Use the outline point below to write the final part of the story.\n"  
-                    f"This is the ending, so conclude the narrative in a satisfying and emotionally resonant way.\n"  
-                    f"Tie up any loose threads and reflect on the protagonist's journey.\n"  
-                    f"Outline Point: {point}\n\n"  
-                    f"Previous Story Context:\n{focused_context}\n\n"  
-                    f"IMPORTANT: Continue smoothly from where the previous part ended.\n"
-                    f"Write at least 500 words for this section.\n"  
-                    f"Ensure consistency in characters, tone, and events.\n"  
-                    f"Do NOT introduce new subplots or major characters.\n"  
-                    f"Please ONLY provide the story narrative in plain text.\n"  
-                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"  
-                    f"Write naturally and engagingly as if for a novel or screenplay.\n"  
-                )  
+                prompt = (
+                    f"You are a professional storyteller continuing a story.\n"
+                    f"This is the final part based on the last outline point.\n"
+                    f"Bring the story to a satisfying conclusion.\n\n"
+                    f"Previous Story (for context):\n{context[-1500:]}\n\n"
+                    f"Next Outline Point: {point}\n\n"
+                    f"Write at least 500 words. ONLY give the story in plain text."
+                )
             else:
-                last_sentences = get_last_sentences(context, 2)
-                focused_context = get_focused_context(context, 1000)
-                prompt = (  
-                    f"You are a professional storyteller.\n"  
-                    f"The previous part ended with: \"{last_sentences}\"\n\n"
-                    f"Based on the outline point below, continue the story coherently using the context provided.\n"  
-                    f"Outline Point: {point}\n\n"  
-                    f"Previous Story Context:\n{focused_context}\n\n"  
-                    f"IMPORTANT: Continue smoothly from where the previous part ended.\n"
-                    f"Focus: Write at least 500 words for the current outline point.\n"  
-                    f"Instructions: Emphasize consistency in characters, tone, and events.\n"  
-                    f"Please ONLY provide the story narrative in plain text.\n"  
-                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"  
-                    f"Write naturally and engagingly as if for a novel or screenplay.\n"  
-                )  
+                prompt = (
+                    f"You are a professional storyteller.\n"
+                    f"Continue the following story logically and emotionally using the next outline point.\n\n"
+                    f"Previous Story (for continuity):\n{context[-1500:]}\n\n"
+                    f"Next Outline Point: {point}\n\n"
+                    f"Ensure characters, tone, and plot flow naturally.\n"
+                    f"Write at least 500 words. ONLY give the story in plain text."
+                )
 
-            data = {  
-                "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",  
-                "messages": [  
-                    {"role": "user", "content": prompt}  
-                ]  
-            }  
+            data = {
+                "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            }
 
-            response = requests.post(url, headers=headers, data=json.dumps(data))  
-            if response.status_code == 200:  
-                result = response.json()  
-                raw_story = result['choices'][0]['message']['content']  
-                return clean_story_output(raw_story)  
-            else:  
-                print(f"Error {response.status_code}: {response.text}")  
-                return None  
+            response = requests.post(url, headers=headers, data=json.dumps(data))
+            if response.status_code == 200:
+                result = response.json()
+                raw_story = result['choices'][0]['message']['content']
+                return clean_story_output(raw_story)
+            else:
+                print(f"Error {response.status_code}: {response.text}")
+                return None
 
-        def main():  
-            full_story = ""  
-            total_points = len(outline_points)  
-            for idx, point in enumerate(outline_points, start=1):  
-                print(f"--- Generating story part {idx} ---")  
-                story_part = generate_story_part(point, full_story, idx, total_points)  
-                if story_part:  
-                    print(story_part)  
-                    print("\n")  
-                    full_story += "\n" + story_part  
-                    time.sleep(2)  
-                else:  
-                    print(f"Failed to generate part {idx}. Stopping.")  
-                    break  
+        def main():
+            full_story = ""
+            total_points = len(outline_points)
 
-            with open("generated_story.txt", "w") as f:  
-                f.write(full_story.strip())  
+            for idx, point in enumerate(outline_points, start=1):
+                print(f"\n--- Generating story part {idx} ---")
+                story_part = generate_story_part(point, full_story, idx, total_points)
+                if story_part:
+                    print(story_part + "\n")
+                    full_story += "\n" + story_part
+                    time.sleep(2)
+                else:
+                    print(f"Failed to generate part {idx}. Stopping.")
+                    break
 
-        if __name__ == "__main__":  
+            with open("generated_story.txt", "w") as f:
+                f.write(full_story.strip())
+
+        if __name__ == "__main__":
             main()
-        EOF  
+        EOF
 
-    - name: Set up Git identity  
-      run: |  
-        git config --global user.name "ansentase"  
-        git config --global user.email "samomsan7@gmail.com"  
+    - name: Set up Git identity
+      run: |
+        git config --global user.name "ansentase"
+        git config --global user.email "samomsan7@gmail.com"
 
-    - name: Commit and push generated story  
-      env:  
-        GH_PAT: ${{ secrets.GH_PAT }}  
-      run: |  
-        git add generated_story.txt  
-        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")  
-        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"  
+    - name: Commit and push generated story
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        git add generated_story.txt
+        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"
         git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
