@@ -24,7 +24,7 @@ jobs:
         INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}  
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}  
       run: |  
-        python3 - <<EOF  
+        cat > story_generator.py << 'SCRIPT_END'  
         import os  
         import json  
         import time  
@@ -177,7 +177,9 @@ jobs:
 
         if __name__ == "__main__":  
             main()
-        EOF  
+        SCRIPT_END
+        
+        python3 story_generator.py  
 
     - name: Set up Git identity  
       run: |  
