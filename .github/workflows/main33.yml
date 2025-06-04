@@ -24,16 +24,171 @@ jobs:
         INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}  
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}  
       run: |  
-        python3 story_generator.py
-    - name: Set up Git identity
-      run: |
-        git config --global user.name "ansentase"
-        git config --global user.email "samomsan7@gmail.com"
-    - name: Commit and push generated story
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        git add generated_story.txt
-        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"
+        python3 - <<EOF  
+        import os  
+        import json  
+        import time  
+        import requests  
+        import re  
+
+        outline_text = os.getenv("INPUT_OUTLINE_TEXT", "")  
+        outline_points = [line.strip() for line in outline_text.strip().split("\n") if line.strip()]  
+
+        url = "https://openrouter.ai/api/v1/chat/completions"  
+        headers = {  
+            "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",  
+            "Content-Type": "application/json",  
+            "HTTP-Referer": "https://your-site.com",  
+            "X-Title": "Story Generator"  
+        }  
+
+        def clean_story_output(raw_text):  
+            lines = raw_text.splitlines()  
+            cleaned_lines = []  
+            skip_patterns = [  
+                r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',  
+                r'.*outline.*'  
+            ]  
+            for line in lines:  
+                if any(re.match(pattern, line, re.IGNORECASE) for pattern in skip_patterns):  
+                    continue  
+                if "NOTE:" in line or line.strip().endswith(":"):  
+                    continue  
+                cleaned_lines.append(line)  
+            return '\n'.join(cleaned_lines).strip()  
+
+        def get_last_sentences(text, num_sentences=2):
+            """Extract the last few sentences for continuity"""
+            if not text.strip():
+                return ""
+            # Split by periods and get last few complete sentences
+            sentences = [s.strip() for s in text.split('.') if s.strip()]
+            if len(sentences) <= num_sentences:
+                return '. '.join(sentences) + '.'
+            return '. '.join(sentences[-num_sentences:]) + '.'
+
+        def get_focused_context(full_story, word_limit=800):
+            """Get recent context within word limit"""
+            if not full_story.strip():
+                return ""
+            words = full_story.split()
+            if len(words) <= word_limit:
+                return full_story
+            return ' '.join(words[-word_limit:])
+
+        def generate_story_part(point, full_context, index, total):  
+            is_first = index == 1  
+            is_last = index == total  
+
+            if is_first:  
+                prompt = (  
+                    f"You are a professional storyteller writing a continuous narrative.\n"
+                    f"Begin the story using this outline point: {point}\n\n"
+                    f"This is the opening, so establish the protagonist, setting, and initial situation clearly.\n"
+                    f"Write at least 500 words. End this section at a natural pause that can flow smoothly into the next part.\n"
+                    f"Please ONLY provide the story narrative in plain text.\n"
+                    f"Do NOT include any titles, section headers, explanations, or any text outside of the story.\n"
+                    f"Write naturally and engagingly as if for a novel."
+                )  
+            else:
+                # Get the last few sentences for smooth transition
+                last_sentences = get_last_sentences(full_context, 2)
+                focused_context = get_focused_context(full_context, 800)
+                
+                if is_last:  
+                    prompt = (  
+                        f"You are continuing a story. The previous part ended with:\n"
+                        f"PREVIOUS ENDING: \"{last_sentences}\"\n\n"
+                        f"Now write the final part using this outline point: {point}\n\n"
+                        f"Recent context for reference: {focused_context}\n\n"
+                        f"CRITICAL INSTRUCTIONS:\n"
+                        f"1. Start by smoothly continuing from exactly where the previous part left off\n"
+                        f"2. Maintain the same scene, character positions, and emotional state at the beginning\n"
+                        f"3. Then develop the story toward a satisfying conclusion\n"
+                        f"4. Tie up loose ends and provide closure\n\n"
+                        f"Write at least 500 words. Please ONLY provide the story narrative in plain text.\n"
+                        f"Do NOT include any titles, section headers, explanations, or any text outside of the story."
+                    )  
+                else:  
+                    prompt = (  
+                        f"You are continuing a story. The previous part ended with:\n"
+                        f"PREVIOUS ENDING: \"{last_sentences}\"\n\n"
+                        f"Continue with this outline point: {point}\n\n"
+                        f"Recent context for reference: {focused_context}\n\n"
+                        f"CRITICAL INSTRUCTIONS:\n"
+                        f"1. Begin by smoothly continuing from exactly where the previous part left off\n"
+                        f"2. Keep the same scene, character locations, and emotional state unless the outline specifically changes them\n"
+                        f"3. Create a seamless transition - no sudden jumps in time, place, or character state\n"
+                        f"4. Develop the current outline point naturally from where you left off\n\n"
+                        f"Write at least 500 words. End at a natural pause that will flow into the next section.\n"
+                        f"Please ONLY provide the story narrative in plain text.\n"
+                        f"Do NOT include any titles, section headers, explanations, or any text outside of the story."
+                    )  
+
+            data = {  
+                "model": "nvidia/llama-3.3-nemotron-super-49b-v1:free",  
+                "messages": [  
+                    {"role": "user", "content": prompt}  
+                ],
+                "temperature": 0.7,
+                "max_tokens": 1000
+            }  
+
+            response = requests.post(url, headers=headers, data=json.dumps(data))  
+            if response.status_code == 200:  
+                result = response.json()  
+                raw_story = result['choices'][0]['message']['content']  
+                return clean_story_output(raw_story)  
+            else:  
+                print(f"Error {response.status_code}: {response.text}")  
+                return None  
+
+        def main():  
+            full_story = ""  
+            total_points = len(outline_points)  
+            print(f"Generating story with {total_points} parts...")
+            
+            for idx, point in enumerate(outline_points, start=1):  
+                print(f"--- Generating story part {idx}/{total_points} ---")  
+                print(f"Outline point: {point}")
+                
+                story_part = generate_story_part(point, full_story, idx, total_points)  
+                if story_part:  
+                    print(f"Generated {len(story_part.split())} words")
+                    print("Preview:", story_part[:100] + "..." if len(story_part) > 100 else story_part)
+                    print("\n")  
+                    
+                    # Add the new part to full story
+                    if full_story.strip():
+                        full_story += "\n\n" + story_part
+                    else:
+                        full_story = story_part
+                    
+                    time.sleep(2)  # Rate limiting
+                else:  
+                    print(f"Failed to generate part {idx}. Stopping.")  
+                    break  
+
+            # Save the complete story
+            with open("generated_story.txt", "w", encoding="utf-8") as f:  
+                f.write(full_story.strip())  
+            
+            print(f"Story generation complete! Total words: {len(full_story.split())}")
+
+        if __name__ == "__main__":  
+            main()
+        EOF  
+
+    - name: Set up Git identity  
+      run: |  
+        git config --global user.name "ansentase"  
+        git config --global user.email "samomsan7@gmail.com"  
+
+    - name: Commit and push generated story  
+      env:  
+        GH_PAT: ${{ secrets.GH_PAT }}  
+      run: |  
+        git add generated_story.txt  
+        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")  
+        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"  
         git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
