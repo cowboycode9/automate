@@ -30,7 +30,7 @@ jobs:
         import asyncio
         import edge_tts
 
-        VOICE = "en-US-BrianMultilingualNeural"
+        VOICE = "ru-RU-DmitryNeural"
         INPUT_FILE = "generated_story.txt"
         OUTPUT_FILE = "generated_story.mp3"
 
