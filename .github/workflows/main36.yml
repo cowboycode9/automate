@@ -43,7 +43,7 @@ jobs:
           # +------------------------------------------------------+
           # |          <<< EDIT YOUR IMAGE PROMPT BELOW >>>        |
           # +------------------------------------------------------+
-          MANUAL_PROMPT = "A futuristic cityscape at sunset with flying cars, photorealistic style"
+          MANUAL_PROMPT = "Generate thumbnail image of A cinematic, high-drama scene inside a modern industrial lab filled with metal pipes and fluorescent lighting. A young woman in a gray hoodie stands confidently at the center, facing forward, her hands resting on a large, complex engine. A serious man in a navy-blue suit stands beside her, pointing critically at the engine. Dozens of factory workers in matching blue uniforms form two symmetrical lines on either side, all standing with arms crossed, watching intently with skeptical or judging expressions. The lighting is dramatic, with high contrast and cool tones (blue-gray palette). A large red arrow overlays the image, pointing at the engine, emphasizing its importance. The overall composition is tightly framed and symmetrical, focusing attention on the central figures. The mood is tense, suspenseful, and emotionally charged — perfect for a YouTube drama story thumbnail. Style should resemble a cinematic movie still, with bold contrast, realistic detail, and high visual intensity."
           # +------------------------------------------------------+
           # |          <<< END OF PROMPT EDITING AREA >>>          |
           # +------------------------------------------------------+
@@ -53,7 +53,7 @@ jobs:
           HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
 
           # Basic prompt validation
-          if not MANUAL_PROMPT or MANUAL_PROMPT == "Generate image of A cinematic, high-drama scene inside a modern industrial lab filled with metal pipes and fluorescent lighting. A young woman in a gray hoodie stands confidently at the center, facing forward, her hands resting on a large, complex engine. A serious man in a navy-blue suit stands beside her, pointing critically at the engine. Dozens of factory workers in matching blue uniforms form two symmetrical lines on either side, all standing with arms crossed, watching intently with skeptical or judging expressions. The lighting is dramatic, with high contrast and cool tones (blue-gray palette). A large red arrow overlays the image, pointing at the engine, emphasizing its importance. The overall composition is tightly framed and symmetrical, focusing attention on the central figures. The mood is tense, suspenseful, and emotionally charged — perfect for a YouTube drama story thumbnail. Style should resemble a cinematic movie still, with bold contrast, realistic detail, and high visual intensity.": # Check against a generic placeholder too
+          if not MANUAL_PROMPT or MANUAL_PROMPT == "YOUR_DETAILED_IMAGE_PROMPT_GOES_HERE": # Check against a generic placeholder too
               print("Error: Please edit the MANUAL_PROMPT variable inside the YAML workflow file before running.")
               sys.exit(1)
 
