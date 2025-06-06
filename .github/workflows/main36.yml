@@ -1,0 +1,133 @@
+
+name: Generate Image (Single File Workflow)
+
+on:
+  workflow_dispatch: # Allows manual triggering
+
+permissions:
+  contents: write  # Allows push access
+
+jobs:
+  generate-image:
+    runs-on: ubuntu-latest
+
+    env:
+      # Ensure these secrets are set in your repository settings
+      # HG_TOKEN is passed specifically to the python script step below
+      GH_PAT: ${{ secrets.GH_PAT }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10" # Or your preferred version
+
+      - name: Install dependencies
+        run: pip install requests pillow
+
+      - name: Generate image using embedded script
+        env:
+          HG_TOKEN: ${{ secrets.HG_TOKEN }} # Pass secret to the script environment
+        run: |
+          python3 - <<EOF
+          import os
+          import requests
+          import json
+          import io
+          import sys
+          from PIL import Image
+
+          # +------------------------------------------------------+
+          # |          <<< EDIT YOUR IMAGE PROMPT BELOW >>>        |
+          # +------------------------------------------------------+
+          MANUAL_PROMPT = "Generate image of A cinematic, high-drama scene inside a modern industrial lab filled with metal pipes and fluorescent lighting. A young woman in a gray hoodie stands confidently at the center, facing forward, her hands resting on a large, complex engine. A serious man in a navy-blue suit stands beside her, pointing critically at the engine. Dozens of factory workers in matching blue uniforms form two symmetrical lines on either side, all standing with arms crossed, watching intently with skeptical or judging expressions. The lighting is dramatic, with high contrast and cool tones (blue-gray palette). A large red arrow overlays the image, pointing at the engine, emphasizing its importance. The overall composition is tightly framed and symmetrical, focusing attention on the central figures. The mood is tense, suspenseful, and emotionally charged — perfect for a YouTube drama story thumbnail. Style should resemble a cinematic movie still, with bold contrast, realistic detail, and high visual intensity."
+          # +------------------------------------------------------+
+          # |          <<< END OF PROMPT EDITING AREA >>>          |
+          # +------------------------------------------------------+
+
+          IMAGE_OUTPUT_DIR = "Images"
+          IMAGE_FILENAME = "generated_image_1.png"
+          # Using a specific model known for good quality, replace if needed
+          # HF_API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
+          HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev" # Original model if preferred
+
+          # Basic prompt validation
+          if not MANUAL_PROMPT or MANUAL_PROMPT == "YOUR_DETAILED_IMAGE_PROMPT_GOES_HERE": # Check against a generic placeholder too
+              print("Error: Please edit the MANUAL_PROMPT variable inside the YAML workflow file before running.")
+              sys.exit(1)
+
+          print(f"Using Manual Prompt: {MANUAL_PROMPT}")
+
+          # Prepare for Hugging Face API call
+          hf_token = os.getenv("HG_TOKEN")
+          if not hf_token:
+              print("Error: HG_TOKEN secret not found in environment.")
+              sys.exit(1)
+
+          hf_headers = {"Authorization": f"Bearer {hf_token}"}
+          payload = {"inputs": MANUAL_PROMPT}
+
+          print(f"Sending request to {HF_API_URL}...")
+          try:
+              img_response = requests.post(HF_API_URL, headers=hf_headers, json=payload, timeout=120) # Added timeout
+              img_response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+
+              print("Request successful, processing image...")
+              # Save image
+              try:
+                  # Check content type to ensure it's an image
+                  content_type = img_response.headers.get("content-type")
+                  if not content_type or not content_type.startswith("image/"):
+                      print(f"Error: Expected an image response, but got content type 	{content_type}")
+                      print(f"Response text: {img_response.text[:500]}...") # Print beginning of text response for debugging
+                      sys.exit(1)
+
+                  image = Image.open(io.BytesIO(img_response.content))
+                  os.makedirs(IMAGE_OUTPUT_DIR, exist_ok=True)
+                  output_path = os.path.join(IMAGE_OUTPUT_DIR, IMAGE_FILENAME)
+                  image.save(output_path)
+                  print(f"Image successfully saved to {output_path}")
+
+              except Exception as e:
+                  print(f"Error: Failed to process or save the image: {e}")
+                  sys.exit(1)
+
+          except requests.exceptions.RequestException as e:
+              print(f"Error: Image generation request failed: {e}")
+              if hasattr(e, 'response') and e.response is not None:
+                  print(f"Status Code: {e.response.status_code}")
+                  try:
+                      print(f"Error details: {e.response.json()}")
+                  except json.JSONDecodeError:
+                      print(f"Error details: {e.response.text}")
+              sys.exit(1)
+
+          EOF
+
+      - name: Set up Git user
+        run: |
+          git config --global user.name "GitHub Action Bot" # Or your desired Git user
+          git config --global user.email "action@github.com" # Or your desired Git email
+
+      - name: Commit and push generated image
+        run: |
+          # Ensure the output directory and file exist as per the script
+          if [ ! -d "Images" ] || [ ! -f "Images/generated_image_1.png" ]; then
+            echo "Generated image not found in Images/generated_image_1.png. Skipping commit."
+            exit 0
+          fi
+          git add Images/generated_image_1.png
+          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          commit_message="Generated image via embedded script at ${timestamp}"
+          # Check if changes exist before committing
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git commit -m "$commit_message"
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+          git push
+
