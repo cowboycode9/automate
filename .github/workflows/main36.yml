@@ -50,9 +50,7 @@ jobs:
 
           IMAGE_OUTPUT_DIR = "Images"
           IMAGE_FILENAME = "generated_image_1.png"
-          # Using a specific model known for good quality, replace if needed
-          # HF_API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-           HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev" # Original model if preferred
+          HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
 
           # Basic prompt validation
           if not MANUAL_PROMPT or MANUAL_PROMPT == "Generate image of A cinematic, high-drama scene inside a modern industrial lab filled with metal pipes and fluorescent lighting. A young woman in a gray hoodie stands confidently at the center, facing forward, her hands resting on a large, complex engine. A serious man in a navy-blue suit stands beside her, pointing critically at the engine. Dozens of factory workers in matching blue uniforms form two symmetrical lines on either side, all standing with arms crossed, watching intently with skeptical or judging expressions. The lighting is dramatic, with high contrast and cool tones (blue-gray palette). A large red arrow overlays the image, pointing at the engine, emphasizing its importance. The overall composition is tightly framed and symmetrical, focusing attention on the central figures. The mood is tense, suspenseful, and emotionally charged — perfect for a YouTube drama story thumbnail. Style should resemble a cinematic movie still, with bold contrast, realistic detail, and high visual intensity.": # Check against a generic placeholder too
