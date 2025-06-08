@@ -52,7 +52,7 @@ jobs:
 
           # Prompt for OpenRouter
           router_headers = {
-              "Authorization": f"Bearer {os.getenv(\'OPENROUTER_API_KEY\')}",
+              "Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}",
               "Content-Type": "application/json",
               "HTTP-Referer": "https://your-site.com",
               "X-Title": "Image Prompt Creator"
@@ -91,7 +91,7 @@ jobs:
           print("Generated Prompt:", prompt_result)
 
           # Generate image using Hugging Face
-          hf_headers = {"Authorization": f"Bearer {os.getenv(\'HG_TOKEN\')}"}
+          hf_headers = {"Authorization": f"Bearer {os.getenv('HG_TOKEN')}"}
           img_response = requests.post(HF_API_URL, headers=hf_headers, json={"inputs": prompt_result})
           if img_response.status_code != 200:
               print(f"Image generation failed: {img_response.status_code}")
