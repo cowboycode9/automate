@@ -1,0 +1,122 @@
+name: Generate Image from Story
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write  # Allows push access
+
+jobs:
+  generate-image:
+    runs-on: ubuntu-latest
+
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      HG_TOKEN: ${{ secrets.HG_TOKEN }}
+      GH_PAT: ${{ secrets.GH_PAT }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install requests pillow
+
+      - name: Generate prompt and image
+        run: |
+          python3 - <<EOF
+          import os
+          import requests
+          import json
+          import io
+          from PIL import Image
+
+          STORY_FILE_PATH = "generated_story.txt"
+          IMAGE_OUTPUT_DIR = "Images"
+          IMAGE_FILENAME = "generated_image_1.png"
+          OPENROUTER_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1:free"
+          HF_API_URL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+
+          # Read story
+          try:
+              with open(STORY_FILE_PATH, "r", encoding="utf-8") as f:
+                  story = f.read()
+          except FileNotFoundError:
+              print("Story file not found.")
+              exit(1)
+
+          # Prompt for OpenRouter
+          router_headers = {
+              "Authorization": f"Bearer {os.getenv(\'OPENROUTER_API_KEY\')}",
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://your-site.com",
+              "X-Title": "Image Prompt Creator"
+          }
+
+          prompt_request = (
+              "You are a highly skilled Visual Storyteller and Prompt Engineer for AI-generated visuals, specializing in creating compelling YouTube thumbnail images. Your task is to analyze a given story and generate a single, highly detailed, and vivid image prompt that captures the most dramatic, pivotal, or emotionally charged moment, or a powerful visual concept directly related to the story\'s core conflict or resolution. The generated image should be suitable for a photorealistic image generation model like Midjourney or Stable Diffusion, adhering to the following stylistic guidelines:\n\n"\
+              "**Stylistic Guidelines for the Image Prompt:**\n"\
+              "1.  **Centralized Focus & Clear Protagonist:** The main character(s) should be prominently featured, often at the center of the composition, conveying their emotions and actions clearly.\n"\
+              "2.  **Dramatic & Confrontational Scene:** The image should depict a moment of high tension, challenge, or significant interaction that drives the story\'s narrative.\n"\
+              "3.  **Specific Environment:** Clearly describe the setting or environment, ensuring it reinforces the story\'s theme (e.g., industrial factory, ancient ruins, bustling city street).\n"\
+              "4.  **Clear Visual Narrative:** The image should tell a story at a glance, allowing viewers to grasp the essence of the conflict or situation without needing to read the title.\n"\
+              "5.  **Photorealistic & High-Quality:** Emphasize realistic rendering, sharp details, appropriate lighting (e.g., dramatic lighting, chiaroscuro), and a cinematic feel.\n"\
+              "6.  **Aspect Ratio:** The image should be composed for a 16:9 aspect ratio.\n"\
+              "7.  **Subtle Highlighting (Optional):** If a specific object or detail is crucial to the scene, you may suggest a subtle highlighting element like a single, well-placed red arrow pointing to it, but only if it enhances the narrative significantly.\n\n"\
+              "**Your Output Requirements:**\n"\
+              "*   **Only return the raw image prompt.** Do not include any conversational text, explanations, or markdown formatting other than the prompt itself.\n"\
+              "*   The prompt should be a single, coherent sentence or a short paragraph, rich in descriptive adjectives and strong verbs.\n"\
+              "*   Focus on visual details: character expressions, actions, specific objects, lighting, atmosphere, and composition.\n\n"\
+              "**Example of Desired Output (for a story about a janitor\'s daughter fixing an engine):**\n"\
+              "\"A determined young woman, the janitor\'s daughter, stands confidently before a massive, intricate industrial engine in a dimly lit, sprawling factory. A stern CEO in a sharp suit points emphatically at a critical component on the engine, while a crowd of skeptical male engineers in blue uniforms stand in formation behind him, arms crossed, observing with doubt. Dramatic lighting, photorealistic, cinematic, 16:9 aspect ratio, subtle red arrow pointing to the critical component on the engine.\"\n\n"\
+              f"**STORY TO ANALYZE:**\n{story}"
+          )
+
+          payload = {
+              "model": OPENROUTER_MODEL,
+              "messages": [{"role": "user", "content": prompt_request}]
+          }
+
+          response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=router_headers, json=payload)
+          if response.status_code != 200:
+              print(f"Prompt generation failed: {response.status_code}")
+              exit(1)
+
+          prompt_result = response.json()["choices"][0]["message"]["content"].strip()
+          print("Generated Prompt:", prompt_result)
+
+          # Generate image using Hugging Face
+          hf_headers = {"Authorization": f"Bearer {os.getenv(\'HG_TOKEN\')}"}
+          img_response = requests.post(HF_API_URL, headers=hf_headers, json={"inputs": prompt_result})
+          if img_response.status_code != 200:
+              print(f"Image generation failed: {img_response.status_code}")
+              exit(1)
+
+          # Save image
+          image = Image.open(io.BytesIO(img_response.content))
+          os.makedirs(IMAGE_OUTPUT_DIR, exist_ok=True)
+          image_resized = image.resize((1600, 900))
+          output_path = os.path.join(IMAGE_OUTPUT_DIR, IMAGE_FILENAME)
+          image_resized.save(output_path)
+          print(f"Image saved to {output_path}")
+          EOF
+
+      - name: Set up Git user
+        run: |
+          git config --global user.name "ansentase"
+          git config --global user.email "samomsan7@gmail.com"
+
+      - name: Commit and push generated image
+        run: |
+          git add Images/generated_image_1.png
+          timestamp=$(date -u)
+          git commit -m "Generated story image: ${timestamp}" || echo "No changes to commit"
+          git remote set-url origin https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}.git
+          git push
+
+
