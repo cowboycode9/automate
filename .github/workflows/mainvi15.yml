@@ -30,7 +30,7 @@ jobs:
       - name: Create video from image and audio
         run: |
           mkdir -p video_output
-          ffmpeg -loop 1 -i Images/generated_image_1.png -i generated_story.mp3 \
+          ffmpeg -loop 1 -i Images/generated_image.jpg -i generated_story.mp3 \
             -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p \
             -shortest -movflags +faststart video_output/final_video.mp4
 
