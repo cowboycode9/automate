@@ -1,1 +1,61 @@
 
+# .github/workflows/generate-story.yml
+
+name: Generate Story from Hierarchical Outline
+
+on:
+  workflow_dispatch:
+    inputs:
+      outline_text:
+        description: 'Hierarchical story outline (with ### SECTION headers and - bullet points)'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # Required for pushing to repo
+
+jobs:
+  generate-story:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests
+
+    - name: Run Hierarchical Story Generator
+      env:
+        INPUT_OUTLINE_TEXT: ${{ github.event.inputs.outline_text }}
+        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      run: python generate_story.py
+
+    - name: Set up Git identity
+      run: |
+        git config --global user.name "ansentase"
+        git config --global user.email "samomsan7@gmail.com"
+
+    - name: Commit and push generated story
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        git add generated_story.txt
+        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        git commit -m "Generated story: ${timestamp}" || echo "No changes to commit"
+        git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
