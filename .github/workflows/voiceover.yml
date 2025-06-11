@@ -39,6 +39,12 @@ jobs:
 
         mkdir -p Audio
 
+        # Remove old audio file if it exists
+        if [ -f "$OUTPUT_FILE_PATH" ]; then
+          echo "Old audio file found. Deleting: $OUTPUT_FILE_PATH"
+          rm "$OUTPUT_FILE_PATH"
+        fi
+
         python3 - <<EOF
         import nest_asyncio
         import asyncio
@@ -69,6 +75,7 @@ jobs:
       env:
         GH_PAT: ${{ secrets.GH_PAT }}
       run: |
+        git pull origin main --rebase
         git add Audio/*.mp3
         timestamp=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %H:%M:%S IST")
         git commit -m "Generated voiceover: ${timestamp}" || echo "No changes to commit"
