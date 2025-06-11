@@ -71,4 +71,3 @@ jobs:
         git commit -m "Generated voiceover: ${timestamp}" || echo "No changes to commit"
         git push https://x-access-token:${GH_PAT}@github.com/cowboycode9/automate.git HEAD:main
 
-
