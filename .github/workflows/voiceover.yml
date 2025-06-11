@@ -2,12 +2,6 @@ name: Generate Voiceover from Story
 
 on:
   workflow_dispatch:
-    inputs:
-      script_number:
-        description: 'The number of the script file (e.g., 1 for s1.txt, 2 for s2.txt)'
-        required: true
-        type: number
-        default: 1 # Default to 1 if not specified
 
 permissions:
   contents: write
@@ -27,13 +21,13 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install edge_tts nest_asyncio
+        pip install edge-tts nest_asyncio
 
     - name: Generate Voiceover with Edge TTS
       run: |
-        SCRIPT_NUMBER="${{ github.event.inputs.script_number }}"
-        export INPUT_FILE_PATH="Script/s${SCRIPT_NUMBER}.txt"
-        export OUTPUT_FILE_PATH="Audio/v${SCRIPT_NUMBER}.mp3"
+        CURRENT_DATE=$(date +"%d%m%Y")
+        export INPUT_FILE_PATH="Script/s${CURRENT_DATE}.txt"
+        export OUTPUT_FILE_PATH="Audio/a${CURRENT_DATE}.mp3"
 
         if [ ! -f "$INPUT_FILE_PATH" ]; then
           echo "Error: Input script file $INPUT_FILE_PATH not found!"
@@ -63,16 +57,6 @@ jobs:
         asyncio.run(amain())
         EOF
 
-    - name: Create script_number file
-      run: echo "${{ github.event.inputs.script_number }}" > script_number.txt
-
-    - name: Save script_number as artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: script-number
-        path: script_number.txt
-        retention-days: 1
-
     - name: Set up Git identity
       run: |
         git config --global user.name "cowboycode9"
@@ -86,4 +70,5 @@ jobs:
         timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
         git commit -m "Generated voiceover: ${timestamp}" || echo "No changes to commit"
         git push https://x-access-token:${GH_PAT}@github.com/cowboycode9/automate.git HEAD:main
+
 
