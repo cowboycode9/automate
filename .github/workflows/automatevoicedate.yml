@@ -26,11 +26,11 @@ jobs:
     - name: Generate Voiceover with Edge TTS
       run: |
         CURRENT_DATE=$(date +"%d%m%Y")
-        INPUT_FILE="Script/s${CURRENT_DATE}.txt"
-        OUTPUT_FILE="Audio/a${CURRENT_DATE}.mp3"
+        export INPUT_FILE_PATH="Script/s${CURRENT_DATE}.txt"
+        export OUTPUT_FILE_PATH="Audio/a${CURRENT_DATE}.mp3"
 
-        if [ ! -f "$INPUT_FILE" ]; then
-          echo "Error: Input script file $INPUT_FILE not found!"
+        if [ ! -f "$INPUT_FILE_PATH" ]; then
+          echo "Error: Input script file $INPUT_FILE_PATH not found!"
           exit 1
         fi
 
@@ -56,9 +56,6 @@ jobs:
         nest_asyncio.apply()
         asyncio.run(amain())
         EOF
-      env:
-        INPUT_FILE_PATH: ${{ env.INPUT_FILE }}
-        OUTPUT_FILE_PATH: ${{ env.OUTPUT_FILE }}
 
     - name: Set up Git identity
       run: |
