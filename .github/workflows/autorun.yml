@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  create_video:
+  create-video:
     runs-on: ubuntu-latest
 
     steps:
@@ -33,9 +33,12 @@ jobs:
       - name: Create video from image and audio
         run: |
           mkdir -p video_output
-          CURRENT_DATE=$(date +"%d%m%Y")
-          IMAGE_FILE="Images/i${CURRENT_DATE}.jpg"
-          AUDIO_FILE="Audio/a${CURRENT_DATE}.mp3"
+          # Get the script_number from the completed workflow's inputs
+          SCRIPT_NUMBER=$(jq -r '.workflow_run.inputs.script_number' "$GITHUB_EVENT_PATH")
+
+          IMAGE_FILE="Images/i${SCRIPT_NUMBER}.jpg"
+          AUDIO_FILE="Audio/a${SCRIPT_NUMBER}.mp3" # Note: The previous workflow outputs vX.mp3, not aX.mp3
+          OUTPUT_VIDEO_FILE="video_output/v${SCRIPT_NUMBER}.mp4"
 
           if [ ! -f "$IMAGE_FILE" ]; then
             echo "Error: Image file $IMAGE_FILE not found!"
@@ -49,7 +52,7 @@ jobs:
 
           ffmpeg -loop 1 -i "$IMAGE_FILE" -i "$AUDIO_FILE" \
             -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p \
-            -vf scale=1920:1080 -shortest -movflags +faststart video_output/final_video.mp4
+            -vf scale=1920:1080 -shortest -movflags +faststart "$OUTPUT_VIDEO_FILE"
 
       - name: Set up Git identity
         run: |
@@ -58,17 +61,19 @@ jobs:
 
       - name: Track video file with Git LFS
         run: |
-          git lfs track "video_output/final_video.mp4"
+          # Get the script_number again for LFS tracking
+          SCRIPT_NUMBER=$(jq -r '.workflow_run.inputs.script_number' "$GITHUB_EVENT_PATH")
+          git lfs track "video_output/v${SCRIPT_NUMBER}.mp4"
           git add .gitattributes
 
       - name: Commit and push final video
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
+          # Get the script_number again for committing
+          SCRIPT_NUMBER=$(jq -r '.workflow_run.inputs.script_number' "$GITHUB_EVENT_PATH")
           git pull origin main --rebase
-          git add video_output/final_video.mp4
+          git add "video_output/v${SCRIPT_NUMBER}.mp4"
           timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          git commit -m "Generated final video: ${timestamp}" || echo "No changes to commit"
+          git commit -m "Generated final video: v${SCRIPT_NUMBER}.mp4 - ${timestamp}" || echo "No changes to commit"
           git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
-
-
