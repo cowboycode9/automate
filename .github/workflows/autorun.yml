@@ -65,6 +65,7 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
+          git pull origin main --rebase
           git add video_output/final_video.mp4
           timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           git commit -m "Generated final video: ${timestamp}" || echo "No changes to commit"
