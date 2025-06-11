@@ -25,6 +25,15 @@ jobs:
           git lfs install
           git lfs pull
 
+      - name: Download script_number artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: script-number
+
+      - name: Read script_number
+        id: get_script_number
+        run: echo "SCRIPT_NUMBER=$(cat script_number.txt)" >> $GITHUB_OUTPUT
+
       - name: Install FFmpeg
         run: |
           sudo apt-get update
@@ -33,11 +42,10 @@ jobs:
       - name: Create video from image and audio
         run: |
           mkdir -p video_output
-          # Get the script_number from the completed workflow's inputs
-          SCRIPT_NUMBER=$(jq -r '.workflow_run.inputs.script_number' "$GITHUB_EVENT_PATH")
+          SCRIPT_NUMBER="${{ steps.get_script_number.outputs.SCRIPT_NUMBER }}"
 
           IMAGE_FILE="Images/i${SCRIPT_NUMBER}.jpg"
-          AUDIO_FILE="Audio/a${SCRIPT_NUMBER}.mp3" # Note: The previous workflow outputs vX.mp3, not aX.mp3
+          AUDIO_FILE="Audio/v${SCRIPT_NUMBER}.mp3"
           OUTPUT_VIDEO_FILE="video_output/v${SCRIPT_NUMBER}.mp4"
 
           if [ ! -f "$IMAGE_FILE" ]; then
@@ -61,8 +69,7 @@ jobs:
 
       - name: Track video file with Git LFS
         run: |
-          # Get the script_number again for LFS tracking
-          SCRIPT_NUMBER=$(jq -r '.workflow_run.inputs.script_number' "$GITHUB_EVENT_PATH")
+          SCRIPT_NUMBER="${{ steps.get_script_number.outputs.SCRIPT_NUMBER }}"
           git lfs track "video_output/v${SCRIPT_NUMBER}.mp4"
           git add .gitattributes
 
@@ -70,10 +77,10 @@ jobs:
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          # Get the script_number again for committing
-          SCRIPT_NUMBER=$(jq -r '.workflow_run.inputs.script_number' "$GITHUB_EVENT_PATH")
+          SCRIPT_NUMBER="${{ steps.get_script_number.outputs.SCRIPT_NUMBER }}"
           git pull origin main --rebase
           git add "video_output/v${SCRIPT_NUMBER}.mp4"
           timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
           git commit -m "Generated final video: v${SCRIPT_NUMBER}.mp4 - ${timestamp}" || echo "No changes to commit"
           git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
+
