@@ -21,13 +21,12 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install edge-tts nest_asyncio
+        pip install edge_tts nest_asyncio
 
     - name: Generate Voiceover with Edge TTS
       run: |
-        CURRENT_DATE=$(date +"%d%m%Y")
-        export INPUT_FILE_PATH="Script/s${CURRENT_DATE}.txt"
-        export OUTPUT_FILE_PATH="Audio/a${CURRENT_DATE}.mp3"
+        export INPUT_FILE_PATH="Script/s1.txt"
+        export OUTPUT_FILE_PATH="Audio/v1.mp3"
 
         if [ ! -f "$INPUT_FILE_PATH" ]; then
           echo "Error: Input script file $INPUT_FILE_PATH not found!"
@@ -70,5 +69,3 @@ jobs:
         timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
         git commit -m "Generated voiceover: ${timestamp}" || echo "No changes to commit"
         git push https://x-access-token:${GH_PAT}@github.com/cowboycode9/automate.git HEAD:main
-
-
