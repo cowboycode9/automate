@@ -63,13 +63,15 @@ jobs:
         asyncio.run(amain())
         EOF
 
+    - name: Create script_number file
+      run: echo "${{ github.event.inputs.script_number }}" > script_number.txt
+
     - name: Save script_number as artifact
       uses: actions/upload-artifact@v3
       with:
         name: script-number
         path: script_number.txt
         retention-days: 1
-      run: echo "${{ github.event.inputs.script_number }}" > script_number.txt
 
     - name: Set up Git identity
       run: |
