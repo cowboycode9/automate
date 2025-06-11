@@ -2,6 +2,12 @@ name: Generate Voiceover from Story
 
 on:
   workflow_dispatch:
+    inputs:
+      script_number:
+        description: 'The number of the script file (e.g., 1 for s1.txt, 2 for s2.txt)'
+        required: true
+        type: number
+        default: 1 # Default to 1 if not specified
 
 permissions:
   contents: write
@@ -25,8 +31,9 @@ jobs:
 
     - name: Generate Voiceover with Edge TTS
       run: |
-        export INPUT_FILE_PATH="Script/s1.txt"
-        export OUTPUT_FILE_PATH="Audio/v1.mp3"
+        SCRIPT_NUMBER="${{ github.event.inputs.script_number }}"
+        export INPUT_FILE_PATH="Script/s${SCRIPT_NUMBER}.txt"
+        export OUTPUT_FILE_PATH="Audio/a${SCRIPT_NUMBER}.mp3"
 
         if [ ! -f "$INPUT_FILE_PATH" ]; then
           echo "Error: Input script file $INPUT_FILE_PATH not found!"
