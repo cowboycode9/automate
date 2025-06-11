@@ -33,7 +33,7 @@ jobs:
       run: |
         SCRIPT_NUMBER="${{ github.event.inputs.script_number }}"
         export INPUT_FILE_PATH="Script/s${SCRIPT_NUMBER}.txt"
-        export OUTPUT_FILE_PATH="Audio/a${SCRIPT_NUMBER}.mp3"
+        export OUTPUT_FILE_PATH="Audio/v${SCRIPT_NUMBER}.mp3"
 
         if [ ! -f "$INPUT_FILE_PATH" ]; then
           echo "Error: Input script file $INPUT_FILE_PATH not found!"
@@ -63,6 +63,14 @@ jobs:
         asyncio.run(amain())
         EOF
 
+    - name: Save script_number as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: script-number
+        path: script_number.txt
+        retention-days: 1
+      run: echo "${{ github.event.inputs.script_number }}" > script_number.txt
+
     - name: Set up Git identity
       run: |
         git config --global user.name "cowboycode9"
@@ -76,3 +84,4 @@ jobs:
         timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
         git commit -m "Generated voiceover: ${timestamp}" || echo "No changes to commit"
         git push https://x-access-token:${GH_PAT}@github.com/cowboycode9/automate.git HEAD:main
+
