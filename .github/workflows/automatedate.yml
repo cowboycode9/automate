@@ -1,0 +1,70 @@
+name: Create Final Video
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  create_video:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Install Git LFS and Pull LFS files
+        run: |
+          git lfs install
+          git lfs pull
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Create video from image and audio
+        run: |
+          mkdir -p video_output
+          CURRENT_DATE=$(date +"%d%m%Y")
+          IMAGE_FILE="Images/i${CURRENT_DATE}.jpg"
+          AUDIO_FILE="Audio/a${CURRENT_DATE}.mp3"
+
+          if [ ! -f "$IMAGE_FILE" ]; then
+            echo "Error: Image file $IMAGE_FILE not found!"
+            exit 1
+          fi
+
+          if [ ! -f "$AUDIO_FILE" ]; then
+            echo "Error: Audio file $AUDIO_FILE not found!"
+            exit 1
+          fi
+
+          ffmpeg -loop 1 -i "$IMAGE_FILE" -i "$AUDIO_FILE" \
+            -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p \
+            -vf scale=1920:1080 -shortest -movflags +faststart video_output/final_video.mp4
+
+      - name: Set up Git identity
+        run: |
+          git config --global user.name "cowboycode9"
+          git config --global user.email "cowboycode9@outlook.com"
+
+      - name: Track video file with Git LFS
+        run: |
+          git lfs track "video_output/final_video.mp4"
+          git add .gitattributes
+
+      - name: Commit and push final video
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git add video_output/final_video.mp4
+          timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          git commit -m "Generated final video: ${timestamp}" || echo "No changes to commit"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
+
+
