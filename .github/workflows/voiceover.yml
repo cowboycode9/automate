@@ -11,74 +11,85 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Set up Python environment
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: Set up Python environment
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Install dependencies
-      run: |
-        pip install edge-tts nest_asyncio
+      - name: Install dependencies
+        run: |
+          pip install edge-tts nest_asyncio
 
-    - name: Generate Voiceover with Edge TTS
-      run: |
-        CURRENT_DATE=$(TZ="Asia/Kolkata" date +"%d%m%Y")
-        export INPUT_FILE_PATH="Script/s${CURRENT_DATE}.txt"
-        export OUTPUT_FILE_PATH="Audio/a${CURRENT_DATE}.mp3"
+      - name: Determine next version number
+        run: |
+          VERSION_FILE="counter.txt"
+          if [ -f "$VERSION_FILE" ]; then
+            VERSION=$(cat "$VERSION_FILE")
+            VERSION=$((VERSION + 1))
+          else
+            VERSION=1
+          fi
+          echo $VERSION > "$VERSION_FILE"
 
-        echo "Looking for script: $INPUT_FILE_PATH"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Using version: $VERSION"
 
-        if [ ! -f "$INPUT_FILE_PATH" ]; then
-          echo "Error: Input script file $INPUT_FILE_PATH not found!"
-          exit 1
-        fi
+      - name: Generate Voiceover
+        run: |
+          INPUT_FILE="Script/s${VERSION}.txt"
+          OUTPUT_FILE="Audio/a${VERSION}.mp3"
 
-        mkdir -p Audio
+          echo "Looking for script: $INPUT_FILE"
+          if [ ! -f "$INPUT_FILE" ]; then
+            echo "Error: Script $INPUT_FILE not found!"
+            exit 1
+          fi
 
-        if [ -f "$OUTPUT_FILE_PATH" ]; then
-          echo "Old audio file exists. Removing: $OUTPUT_FILE_PATH"
-          rm "$OUTPUT_FILE_PATH"
-        fi
+          mkdir -p Audio
 
-        python3 - <<EOF
-        import nest_asyncio
-        import asyncio
-        import edge_tts
-        import os
+          if [ -f "$OUTPUT_FILE" ]; then
+            echo "Removing old audio: $OUTPUT_FILE"
+            rm "$OUTPUT_FILE"
+          fi
 
-        VOICE = "ru-RU-DmitryNeural"
-        INPUT_FILE = os.getenv("INPUT_FILE_PATH")
-        OUTPUT_FILE = os.getenv("OUTPUT_FILE_PATH")
+          python3 - <<EOF
+          import nest_asyncio
+          import asyncio
+          import edge_tts
+          import os
 
-        with open(INPUT_FILE, "r") as f:
-            TEXT = f.read()
+          VOICE = "ru-RU-DmitryNeural"
+          INPUT_FILE = "Script/s${VERSION}.txt"
+          OUTPUT_FILE = "Audio/a${VERSION}.mp3"
 
-        async def amain():
-            communicate = edge_tts.Communicate(TEXT, VOICE)
-            await communicate.save(OUTPUT_FILE)
+          with open(INPUT_FILE, "r") as f:
+              TEXT = f.read()
 
-        nest_asyncio.apply()
-        asyncio.run(amain())
-        EOF
+          async def amain():
+              communicate = edge_tts.Communicate(TEXT, VOICE)
+              await communicate.save(OUTPUT_FILE)
 
-    - name: Set up Git identity
-      run: |
-        git config --global user.name "cowboycode9"
-        git config --global user.email "cowboycode9@outlook.com"
+          nest_asyncio.apply()
+          asyncio.run(amain())
+          EOF
 
-    - name: Commit and push voiceover
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        # Safely handle remote changes
-        git stash
-        git pull origin main --rebase
-        git stash pop || true
+      - name: Save version to yt.txt
+        run: |
+          echo "${VERSION}" > yt.txt
 
-        git add Audio/*.mp3
-        timestamp=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %H:%M:%S IST")
-        git commit -m "Generated voiceover: ${timestamp}" || echo "No changes to commit"
-        git push https://x-access-token:${GH_PAT}@github.com/cowboycode9/automate.git HEAD:main
+      - name: Set up Git identity
+        run: |
+          git config --global user.name "cowboycode9"
+          git config --global user.email "cowboycode9@outlook.com"
+
+      - name: Commit and push files
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          git pull origin main --rebase
+          git add Audio/*.mp3 yt.txt counter.txt
+          git commit -m "Generated voiceover for version v${VERSION}" || echo "No changes to commit"
+          git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
