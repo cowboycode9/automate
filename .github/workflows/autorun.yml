@@ -30,21 +30,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Read version from yt.txt and create video
+      - name: Set up Git identity
+        run: |
+          git config --global user.name "cowboycode9"
+          git config --global user.email "cowboycode9@outlook.com"
+
+      - name: Remove old video if exists
+        run: |
+          if [ -f video_output/final_video.mp4 ]; then
+            echo "Removing old final video"
+            rm video_output/final_video.mp4
+          fi
+
+      - name: Read version and create video
         run: |
           mkdir -p video_output
-
-          if [ ! -f yt.txt ]; then
-            echo "Error: yt.txt not found!"
-            exit 1
-          fi
 
           VERSION=$(cat yt.txt | tr -d '\n')
           IMAGE_FILE="Images/i${VERSION}.jpg"
           AUDIO_FILE="Audio/a${VERSION}.mp3"
+          OUTPUT_VIDEO="video_output/final_video.mp4"
 
-          echo "Using image: $IMAGE_FILE"
-          echo "Using audio: $AUDIO_FILE"
+          echo "Using version: $VERSION"
+          echo "Image: $IMAGE_FILE"
+          echo "Audio: $AUDIO_FILE"
 
           if [ ! -f "$IMAGE_FILE" ]; then
             echo "Error: Image file $IMAGE_FILE not found!"
@@ -56,14 +65,9 @@ jobs:
             exit 1
           fi
 
-          ffmpeg -loop 1 -i "$IMAGE_FILE" -i "$AUDIO_FILE" \
+          ffmpeg -y -loop 1 -i "$IMAGE_FILE" -i "$AUDIO_FILE" \
             -c:v libx264 -tune stillimage -c:a aac -b:a 192k -pix_fmt yuv420p \
-            -vf scale=1920:1080 -shortest -movflags +faststart video_output/final_video.mp4
-
-      - name: Set up Git identity
-        run: |
-          git config --global user.name "cowboycode9"
-          git config --global user.email "cowboycode9@outlook.com"
+            -vf scale=1920:1080 -shortest -movflags +faststart "$OUTPUT_VIDEO"
 
       - name: Track video file with Git LFS
         run: |
@@ -75,10 +79,13 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           git stash --include-untracked
-          git pull origin main --rebase
+          git pull origin main --rebase || echo "Warning: Rebase conflict skipped"
           git stash pop || true
 
           git add video_output/final_video.mp4
+
+          VERSION=$(cat yt.txt | tr -d '\n')
           timestamp=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %H:%M:%S IST")
-          git commit -m "Generated final video from version: $(cat yt.txt)" || echo "No changes to commit"
+
+          git commit -m "Generated final video v${VERSION}: ${timestamp}" || echo "No changes to commit"
           git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
