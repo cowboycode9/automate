@@ -2,6 +2,11 @@ name: Generate Voiceover from Story
 
 on:
   workflow_dispatch:
+    inputs:
+      number:
+        description: 'Enter the version number (e.g. 1, 2, 3)'
+        required: true
+        default: '1'
 
 permissions:
   contents: write
@@ -23,25 +28,15 @@ jobs:
       run: |
         pip install edge-tts nest_asyncio
 
-    - name: Determine version number
+    - name: Prepare file paths based on input
       run: |
-        mkdir -p Audio Script Images
-        COUNTER_FILE="counter.txt"
-
-        if [ -f "$COUNTER_FILE" ]; then
-          VERSION=$(cat $COUNTER_FILE)
-          VERSION=$((VERSION + 1))
-        else
-          VERSION=1
-        fi
-
-        echo "$VERSION" > "$COUNTER_FILE"
+        export VERSION=${{ github.event.inputs.number }}
         echo "VERSION=$VERSION" >> $GITHUB_ENV
 
     - name: Generate Voiceover with Edge TTS
       run: |
-        export INPUT_FILE_PATH="Script/s${VERSION}.txt"
-        export OUTPUT_FILE_PATH="Audio/a${VERSION}.mp3"
+        INPUT_FILE_PATH="Script/s${VERSION}.txt"
+        OUTPUT_FILE_PATH="Audio/a${VERSION}.mp3"
 
         echo "Looking for script: $INPUT_FILE_PATH"
 
@@ -53,7 +48,7 @@ jobs:
         mkdir -p Audio
 
         if [ -f "$OUTPUT_FILE_PATH" ]; then
-          echo "Old audio file exists. Removing: $OUTPUT_FILE_PATH"
+          echo "Replacing existing audio file: $OUTPUT_FILE_PATH"
           rm "$OUTPUT_FILE_PATH"
         fi
 
@@ -64,8 +59,8 @@ jobs:
         import os
 
         VOICE = "ru-RU-DmitryNeural"
-        INPUT_FILE = os.getenv("INPUT_FILE_PATH")
-        OUTPUT_FILE = os.getenv("OUTPUT_FILE_PATH")
+        INPUT_FILE = "${INPUT_FILE_PATH}"
+        OUTPUT_FILE = "${OUTPUT_FILE_PATH}"
 
         with open(INPUT_FILE, "r") as f:
             TEXT = f.read()
@@ -78,7 +73,7 @@ jobs:
         asyncio.run(amain())
         EOF
 
-    - name: Write yt.txt with current version
+    - name: Write yt.txt with version number
       run: |
         echo "$VERSION" > yt.txt
         echo "Created yt.txt with version: $VERSION"
@@ -96,7 +91,7 @@ jobs:
         git pull origin main --rebase || echo "Warning: rebase skipped"
         git stash pop || true
 
-        git add Audio/*.mp3 yt.txt counter.txt
+        git add Audio/*.mp3 yt.txt
         timestamp=$(TZ="Asia/Kolkata" date +"%Y-%m-%d %H:%M:%S IST")
         git commit -m "Generated voiceover v${VERSION}: ${timestamp}" || echo "No changes to commit"
         git push https://x-access-token:${GH_PAT}@github.com/${{ github.repository }}.git HEAD:main
