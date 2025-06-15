@@ -415,4 +415,12 @@ jobs:
         git config --global user.name "ansentase"
         git config --global user.email "samomsan7@gmail.com"
 
-    - name: Commit and push generated
+    - name: Commit and push generatedgenerated
+      env:
+        GH_PAT: ${{ secrets.GH_PAT }}
+      run: |
+        git add generated_story.txt story_state.json
+        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        git commit -m "Generated enhanced story with state tracking: ${timestamp}" || echo "No changes to commit"
+        git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
+
