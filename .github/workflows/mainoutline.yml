@@ -80,7 +80,12 @@ jobs:
                 
                 for part in recent_parts:
                     if 'summary' in part and part['summary']:
-                        summary_parts.append(part['summary'])
+                        # Handle both string and list summaries
+                        summary = part['summary']
+                        if isinstance(summary, list):
+                            summary_parts.extend(summary)
+                        else:
+                            summary_parts.append(str(summary))
                 
                 self.rolling_summary = " ".join(summary_parts)
             
@@ -409,16 +414,4 @@ jobs:
             main()
         EOF
 
-    - name: Set up Git identity
-      run: |
-        git config --global user.name "ansentase"
-        git config --global user.email "samomsan7@gmail.com"
-
-    - name: Commit and push generated story
-      env:
-        GH_PAT: ${{ secrets.GH_PAT }}
-      run: |
-        git add generated_story.txt story_state.json
-        timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-        git commit -m "Generated enhanced story with state tracking: ${timestamp}" || echo "No changes to commit"
-        git push https://x-access-token:${GH_PAT}@github.com/ansentase/scriptgen.git HEAD:main
+    
