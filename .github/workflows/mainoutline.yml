@@ -93,7 +93,7 @@ jobs:
                     return ""
                 
                 last_text = self.story_parts[-1]['text']
-                paragraphs = [p.strip() for p in last_text.split('\\n') if p.strip()]
+                paragraphs = [p.strip() for p in last_text.split('\n') if p.strip()]
                 return paragraphs[-1] if paragraphs else ""
             
             def format_character_memory(self):
@@ -150,8 +150,8 @@ jobs:
                         result = response.json()
                         metadata_text = result['choices'][0]['message']['content'].strip()
                         # Try to parse JSON
-                        metadata_text = re.sub(r'^```json\\s*', '', metadata_text)
-                        metadata_text = re.sub(r'\\s*```$', '', metadata_text)
+                        metadata_text = re.sub(r'^```json\s*', '', metadata_text)
+                        metadata_text = re.sub(r'\s*```$', '', metadata_text)
                         return json.loads(metadata_text)
                 except Exception as e:
                     print(f"Metadata extraction failed: {e}")
@@ -175,29 +175,29 @@ jobs:
                 part_content = outline_part.get('content', '')
                 
                 base_style = (
-                    "Write in a cinematic, dramatic storytelling style with these characteristics:\\n"
-                    "- Use present tense throughout the narrative\\n"
-                    "- Write with vivid, sensory details that paint clear mental pictures\\n"
-                    "- Include dialogue that feels natural and reveals character\\n"
-                    "- Build tension through pacing and atmosphere\\n"
-                    "- Show emotions through actions and physical reactions\\n"
-                    "- Create immersive scenes with specific details\\n"
-                    "- Maintain perfect continuity with previous story elements\\n\\n"
+                    "Write in a cinematic, dramatic storytelling style with these characteristics:\n"
+                    "- Use present tense throughout the narrative\n"
+                    "- Write with vivid, sensory details that paint clear mental pictures\n"
+                    "- Include dialogue that feels natural and reveals character\n"
+                    "- Build tension through pacing and atmosphere\n"
+                    "- Show emotions through actions and physical reactions\n"
+                    "- Create immersive scenes with specific details\n"
+                    "- Maintain perfect continuity with previous story elements\n\n"
                 )
                 
                 if is_first:
                     return (
-                        f"🎬 START A CINEMATIC STORY\\n\\n"
+                        f"🎬 START A CINEMATIC STORY\n\n"
                         f"{base_style}"
-                        f"This is Part 1 of {total_parts}: {part_title}\\n"
-                        f"Create a compelling opening that establishes:\\n"
-                        f"- Main characters with distinct personalities\\n"
-                        f"- Setting and atmosphere\\n"
-                        f"- Central conflict or tension\\n"
-                        f"- Hook that grabs attention\\n\\n"
-                        f"📋 OUTLINE POINT TO DEVELOP:\\n{part_content}\\n\\n"
-                        f"✍️ WRITE THE OPENING (600-800 words):\\n"
-                        f"Write ONLY the story narrative. No titles, headers, or commentary.\\n"
+                        f"This is Part 1 of {total_parts}: {part_title}\n"
+                        f"Create a compelling opening that establishes:\n"
+                        f"- Main characters with distinct personalities\n"
+                        f"- Setting and atmosphere\n"
+                        f"- Central conflict or tension\n"
+                        f"- Hook that grabs attention\n\n"
+                        f"📋 OUTLINE POINT TO DEVELOP:\n{part_content}\n\n"
+                        f"✍️ WRITE THE OPENING (600-800 words):\n"
+                        f"Write ONLY the story narrative. No titles, headers, or commentary.\n"
                         f"Begin with immediate dramatic action or compelling dialogue."
                     )
                 
@@ -212,29 +212,29 @@ jobs:
                 narrative_intent = "Bring all threads to a powerful conclusion" if is_last else "Escalate tension and develop characters"
                 
                 return (
-                    f"🎬 CONTINUE THE CINEMATIC STORY\\n\\n"
-                    f"You're writing Part {part_number} of {total_parts} ({section_type}): {part_title}\\n"
-                    f"Continue with perfect emotional and narrative continuity.\\n\\n"
-                    f"Maintain:\\n"
-                    f"- Character personalities and arcs\\n"
-                    f"- Emotional progression\\n"
-                    f"- Logical causality\\n"
-                    f"- Consistent time and location flow\\n\\n"
-                    f"---\\n\\n"
-                    f"🧾 STORY SUMMARY SO FAR:\\n{rolling_summary}\\n\\n"
-                    f"🎭 LAST PARAGRAPH (Scene Memory):\\n{last_paragraph}\\n\\n"
-                    f"🧍 CHARACTER MEMORY:\\n{character_memory}\\n\\n"
-                    f"🧑‍🤝‍🧑 ACTIVE CHARACTERS:\\n{active_chars}\\n\\n"
-                    f"🕒 CURRENT STORY TIME:\\n{self.state.current_time}\\n"
-                    f"🗺️ CURRENT LOCATION:\\n{self.state.current_location}\\n\\n"
-                    f"🎯 OBJECTIVE FOR THIS PART:\\n{narrative_intent}\\n\\n"
-                    f"📋 OUTLINE POINT TO DEVELOP:\\n{part_content}\\n\\n"
-                    f"---\\n\\n"
-                    f"✍️ WRITE THE NEXT PART:\\n"
-                    f"Write in cinematic narrator style. Use strong emotional beats.\\n"
-                    f"Maintain continuity with all above context.\\n"
-                    f"Output 600-800 words.\\n"
-                    f"End on a natural tension, cliffhanger, or reveal.\\n"
+                    f"🎬 CONTINUE THE CINEMATIC STORY\n\n"
+                    f"You're writing Part {part_number} of {total_parts} ({section_type}): {part_title}\n"
+                    f"Continue with perfect emotional and narrative continuity.\n\n"
+                    f"Maintain:\n"
+                    f"- Character personalities and arcs\n"
+                    f"- Emotional progression\n"
+                    f"- Logical causality\n"
+                    f"- Consistent time and location flow\n\n"
+                    f"---\n\n"
+                    f"🧾 STORY SUMMARY SO FAR:\n{rolling_summary}\n\n"
+                    f"🎭 LAST PARAGRAPH (Scene Memory):\n{last_paragraph}\n\n"
+                    f"🧍 CHARACTER MEMORY:\n{character_memory}\n\n"
+                    f"🧑‍🤝‍🧑 ACTIVE CHARACTERS:\n{active_chars}\n\n"
+                    f"🕒 CURRENT STORY TIME:\n{self.state.current_time}\n"
+                    f"🗺️ CURRENT LOCATION:\n{self.state.current_location}\n\n"
+                    f"🎯 OBJECTIVE FOR THIS PART:\n{narrative_intent}\n\n"
+                    f"📋 OUTLINE POINT TO DEVELOP:\n{part_content}\n\n"
+                    f"---\n\n"
+                    f"✍️ WRITE THE NEXT PART:\n"
+                    f"Write in cinematic narrator style. Use strong emotional beats.\n"
+                    f"Maintain continuity with all above context.\n"
+                    f"Output 600-800 words.\n"
+                    f"End on a natural tension, cliffhanger, or reveal.\n"
                     f"Write ONLY the story narrative - no titles, headers, or commentary."
                 )
             
@@ -292,11 +292,11 @@ jobs:
                 cleaned_lines = []
                 
                 skip_patterns = [
-                    r'^\\s*(\\*+|---+|###*|Point \\d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
+                    r'^\s*(\*+|---+|###*|Point \d+.*|End of.*|Preparation for.*|Continuity Notes.*|Please Provide.*|Generating story.*|Context.*|Tone:.*|Events:.*|Character Development:.*|NOTE:.*)',
                     r'.*outline.*',
-                    r'^\\s*🎬.*',
-                    r'^\\s*✍️.*',
-                    r'^\\s*📋.*'
+                    r'^\s*🎬.*',
+                    r'^\s*✍️.*',
+                    r'^\s*📋.*'
                 ]
                 
                 for line in lines:
@@ -306,7 +306,7 @@ jobs:
                         continue
                     cleaned_lines.append(line)
                 
-                return '\\n'.join(cleaned_lines).strip()
+                return '\n'.join(cleaned_lines).strip()
             
             def generate_complete_story(self, outline_parts):
                 """Generate complete story with advanced continuation logic"""
@@ -335,7 +335,7 @@ jobs:
                         self.state.add_part(metadata)
                         
                         # Add to full story
-                        full_story += "\\n\\n" + story_part
+                        full_story += "\n\n" + story_part
                         
                         print(f"Characters: {metadata.get('characters_mentioned', [])}")
                         print(f"Emotion: {metadata.get('scene_emotion', 'neutral')}")
